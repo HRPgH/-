@@ -138,6 +138,7 @@ export default function Home() {
   const [chatMessages, setChatMessages] = useState<MessageItem[]>([]);
   const [inputMessage, setInputMessage] = useState<string>('');
   const [unreadCounts, setUnreadCounts] = useState<{ [idKey: string]: number }>({});
+  const [latestWorkerMessageAt, setLatestWorkerMessageAt] = useState<{ [idKey: string]: string }>({});
 
   const [activeModal, setActiveModal] = useState<'shuttle' | 'guide' | null>(null);
   const [isFirstLoginGuide, setIsFirstLoginGuide] = useState(false);
@@ -222,13 +223,21 @@ export default function Home() {
       const { data, error } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
       if (data && !error) {
         const counts: { [idKey: string]: number } = {};
+        const latestWorkerMessages: { [idKey: string]: string } = {};
         data.forEach((msg: MessageItem) => {
+          if (msg.sender_role === 'worker' && msg.created_at) {
+            const latestAt = latestWorkerMessages[msg.sender_name];
+            if (!latestAt || msg.created_at > latestAt) {
+              latestWorkerMessages[msg.sender_name] = msg.created_at;
+            }
+          }
           if (!msg.is_read) {
             if (role === 'admin' && msg.sender_role === 'worker') { counts[msg.sender_name] = (counts[msg.sender_name] || 0) + 1; }
             else if (role === 'worker' && msg.receiver_name === userUniqueKey) { counts['admin'] = (counts['admin'] || 0) + 1; }
           }
         });
         setUnreadCounts(counts);
+        setLatestWorkerMessageAt(latestWorkerMessages);
 
         const currentTarget = role === 'admin' ? chatTargetWorkerKey : userUniqueKey;
         const filtered = data.filter((msg: MessageItem) => msg.sender_name === currentTarget || msg.receiver_name === currentTarget);
@@ -880,9 +889,20 @@ export default function Home() {
     const itemA = memberDb[aKey];
     const itemB = memberDb[bKey];
 
+    if (!!itemA?.isJoined !== !!itemB?.isJoined) {
+      return itemA?.isJoined ? 1 : -1;
+    }
+
+    const latestMessageA = latestWorkerMessageAt[aKey];
+    const latestMessageB = latestWorkerMessageAt[bKey];
+    if (latestMessageA !== latestMessageB) {
+      if (!latestMessageA) return 1;
+      if (!latestMessageB) return -1;
+      return latestMessageB.localeCompare(latestMessageA);
+    }
+
     const getRank = (item?: MemberItem) => {
       if (!item) return 99;
-      if (item.isJoined) return 5;
       if (workerResponses[item.idKey] === 'possible') return 1;
       if (item.isOnline) return 2;
       if (item.lastLoginAt) return 3;
