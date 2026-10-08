@@ -133,6 +133,7 @@ export default function Home() {
   const [isLockedOut, setIsLockedOut] = useState<boolean>(false);
   const [selectedAvailabilityDate, setSelectedAvailabilityDate] = useState<string>(() => getAvailabilityDateKey());
   const [availabilityRecords, setAvailabilityRecords] = useState<AvailabilityItem[]>([]);
+  const [isSavingAvailability, setIsSavingAvailability] = useState<boolean>(false);
 
   const [userName, setUserName] = useState<string>('');
   const [userCode, setUserCode] = useState<string>('');
@@ -943,18 +944,39 @@ export default function Home() {
   };
 
   const handleResponse = async (status: 'possible' | 'impossible') => {
-    if (!supabase) return;
+    if (!supabase || isSavingAvailability) return;
+    setIsSavingAvailability(true);
     try {
-      const { error } = await supabase.from('work_availabilities').insert([{ worker_name: userUniqueKey, status }]);
+      const isClearingResponse = workerResponses[userUniqueKey] === status;
+      let error;
+
+      if (isClearingResponse) {
+        const responseDateStart = new Date(`${getAvailabilityDateKey()}T00:00:00+09:00`);
+        const responseDateEnd = new Date(responseDateStart);
+        responseDateEnd.setUTCDate(responseDateEnd.getUTCDate() + 1);
+        ({ error } = await supabase
+          .from('work_availabilities')
+          .delete()
+          .eq('worker_name', userUniqueKey)
+          .gte('created_at', responseDateStart.toISOString())
+          .lt('created_at', responseDateEnd.toISOString()));
+      } else {
+        ({ error } = await supabase.from('work_availabilities').insert([{ worker_name: userUniqueKey, status }]));
+      }
+
       if (error) {
         alert(`출근 응답 저장에 실패했습니다: ${error.message}`);
         return;
       }
-      alert(status === 'possible' ? '출근 가능으로 제출되었습니다!' : '어려움으로 제출되었습니다.');
+      alert(isClearingResponse
+        ? '출근 응답을 미제출로 변경했습니다.'
+        : status === 'possible' ? '출근 가능으로 제출되었습니다!' : '어려움으로 제출되었습니다.');
       await fetchCounts();
     } catch (error) {
       const message = error instanceof Error ? error.message : '알 수 없는 오류';
       alert(`출근 응답 저장에 실패했습니다: ${message}`);
+    } finally {
+      setIsSavingAvailability(false);
     }
   };
 
@@ -1337,11 +1359,12 @@ export default function Home() {
             <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-xl">
               <p className="text-xs text-slate-400 font-medium mb-1">{workDateString} · 주간조/야간조</p>
               <h2 className="text-xl font-bold mb-1">다음 근무일 출근 가능하신가요?</h2>
-              <p className="text-xs text-slate-400 mb-5">오후 6시까지 출근 여부를 제출해 주세요.</p>
+              <p className="text-xs text-slate-400 mb-5">오후 6시까지 출근 여부를 제출해 주세요. 선택한 응답을 다시 누르면 미제출로 바뀝니다.</p>
 
               <div className="flex gap-2.5 mb-4">
                 <button
                   onClick={() => handleResponse('possible')}
+                  disabled={isSavingAvailability}
                   className={`flex-1 py-3 rounded-xl font-bold text-sm transition ${
                     workerResponses[userUniqueKey] === 'possible' ? 'bg-blue-500 text-white ring-2 ring-blue-300' : 'bg-blue-600 hover:bg-blue-500 text-white'
                   }`}
@@ -1350,6 +1373,7 @@ export default function Home() {
                 </button>
                 <button
                   onClick={() => handleResponse('impossible')}
+                  disabled={isSavingAvailability}
                   className={`flex-1 py-3 rounded-xl font-bold text-sm transition ${
                     workerResponses[userUniqueKey] === 'impossible' ? 'bg-slate-600 text-white ring-2 ring-slate-400' : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
                   }`}
