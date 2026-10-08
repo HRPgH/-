@@ -140,10 +140,13 @@ export default function Home() {
   const [inputMessage, setInputMessage] = useState<string>('');
   const [unreadCounts, setUnreadCounts] = useState<{ [idKey: string]: number }>({});
   const [latestWorkerMessageAt, setLatestWorkerMessageAt] = useState<{ [idKey: string]: string }>({});
+  const [adminIncomingMessage, setAdminIncomingMessage] = useState<MessageItem | null>(null);
 
   const [activeModal, setActiveModal] = useState<'shuttle' | 'guide' | null>(null);
   const [isFirstLoginGuide, setIsFirstLoginGuide] = useState(false);
   const welcomeMessageRequests = useRef(new Set<string>());
+  const seenWorkerMessageIds = useRef(new Set<number>());
+  const hasInitializedAdminMessages = useRef(false);
 
   const userUniqueKey = `${userName}_${userCode}`;
   const responseDate = role === 'admin' ? selectedAvailabilityDate : getAvailabilityDateKey();
@@ -225,6 +228,21 @@ export default function Home() {
       if (data && !error) {
         const counts: { [idKey: string]: number } = {};
         const latestWorkerMessages: { [idKey: string]: string } = {};
+        const workerMessages = data.filter(
+          (msg: MessageItem): msg is MessageItem & { id: number } =>
+            msg.sender_role === 'worker' && typeof msg.id === 'number'
+        );
+        if (role === 'admin') {
+          if (!hasInitializedAdminMessages.current) {
+            workerMessages.forEach((msg) => seenWorkerMessageIds.current.add(msg.id));
+            hasInitializedAdminMessages.current = true;
+          } else {
+            const newMessages = workerMessages.filter((msg) => !seenWorkerMessageIds.current.has(msg.id));
+            workerMessages.forEach((msg) => seenWorkerMessageIds.current.add(msg.id));
+            const latestNewMessage = newMessages[newMessages.length - 1];
+            if (latestNewMessage) setAdminIncomingMessage(latestNewMessage);
+          }
+        }
         data.forEach((msg: MessageItem) => {
           if (msg.sender_role === 'worker' && msg.created_at) {
             const latestAt = latestWorkerMessages[msg.sender_name];
@@ -965,6 +983,36 @@ export default function Home() {
 
       <div className="max-w-md mx-auto bg-slate-50 min-h-[780px] rounded-[3rem] border-[8px] border-slate-900 shadow-2xl overflow-hidden relative p-5">
         <div className="w-32 h-4 bg-slate-900 mx-auto rounded-b-xl mb-4"></div>
+
+        {isLoggedIn && role === 'admin' && adminIncomingMessage && (
+          <div className="absolute top-8 left-4 right-4 z-40 bg-white border border-blue-200 rounded-2xl shadow-xl p-3">
+            <div className="flex items-start gap-2.5">
+              <span className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                <MessageSquare className="w-4 h-4" />
+              </span>
+              <button
+                onClick={() => {
+                  openChatWithWorker(adminIncomingMessage.sender_name);
+                  setAdminIncomingMessage(null);
+                }}
+                className="min-w-0 flex-1 text-left"
+              >
+                <span className="block text-[11px] font-bold text-blue-700">
+                  새 지원자 메시지 · {memberDb[adminIncomingMessage.sender_name]?.name || adminIncomingMessage.sender_name.split('_')[0]}
+                </span>
+                <span className="block text-xs text-slate-600 truncate mt-0.5">{adminIncomingMessage.message}</span>
+                <span className="block text-[10px] font-bold text-blue-600 mt-1">눌러서 대화 확인하기</span>
+              </button>
+              <button
+                onClick={() => setAdminIncomingMessage(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+                aria-label="알림 닫기"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         <input
           type="file"
