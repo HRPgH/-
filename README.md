@@ -7,6 +7,13 @@ npm install
 npm run dev
 ```
 
+## 휴대폰 홈 화면에 앱처럼 설치하기
+
+배포된 Shiftmate 웹앱은 PWA 설정을 포함합니다. HTTPS 주소를 Android Chrome 또는 iPhone Safari에서 열어 홈 화면에 추가하면 앱 아이콘으로 실행할 수 있습니다. 이는 앱스토어 설치나 오프라인 동작, 푸시 알림을 뜻하지 않습니다.
+
+- Android Chrome: 브라우저 메뉴에서 `앱 설치` 또는 `홈 화면에 추가`를 선택합니다.
+- iPhone Safari: 공유 버튼을 누르고 `홈 화면에 추가`를 선택합니다.
+
 ## 공개 테스트 배포 전 관리자 로그인 설정
 
 GitHub에 코드를 공개하거나 웹앱을 배포하기 전에 Supabase SQL Editor에서 [`supabase/migrations/20261008_secure_admin_login.sql`](./supabase/migrations/20261008_secure_admin_login.sql)을 실행하고 배포해야 합니다. 이 설정은 브라우저에서 관리자 비밀번호를 직접 읽지 못하게 하지만, 앱의 다른 Supabase 테이블 권한까지 모두 보호하는 것은 아닙니다. 실제 데이터가 연결된 공개 배포 전에는 각 테이블의 Row Level Security 정책과 권한도 별도로 검토하세요.
