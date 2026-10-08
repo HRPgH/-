@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Shiftmate</string>
+    <string name="title_activity_main">Shiftmate</string>
+    <string name="package_name">com.ollpum.shiftmate</string>
+    <string name="custom_url_scheme">com.ollpum.shiftmate</string>
+</resources>
