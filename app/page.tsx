@@ -323,10 +323,17 @@ export default function Home() {
 
   const handleDeleteAnnouncement = async (announceId: number) => {
     if (confirm('해당 공지사항을 삭제하시겠습니까?')) {
-      if (supabase) {
-        await supabase.from('announcements').delete().eq('id', announceId);
-        fetchAnnouncements();
+      if (!supabase) {
+        alert('공지사항을 삭제할 수 없습니다. DB 연결을 확인해 주세요.');
+        return;
       }
+
+      const { error } = await supabase.from('announcements').delete().eq('id', announceId);
+      if (error) {
+        alert(`공지사항 삭제에 실패했습니다: ${error.message}`);
+        return;
+      }
+      await fetchAnnouncements();
     }
   };
 
@@ -1506,7 +1513,7 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-2xl flex items-center justify-between">
+            <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-2xl flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <Megaphone className="w-4 h-4 text-amber-600 shrink-0" />
                 <div>
@@ -1514,12 +1521,20 @@ export default function Home() {
                   <p className="text-[10px] text-amber-700">종 모양(🔔) 알림 창으로 공지 전송</p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowBroadcastModal(true)}
-                className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition shadow-sm"
-              >
-                공지 작성
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => setShowAnnouncePopup(true)}
+                  className="bg-white hover:bg-amber-100 border border-amber-200 text-amber-800 text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition"
+                >
+                  공지 목록
+                </button>
+                <button
+                  onClick={() => setShowBroadcastModal(true)}
+                  className="bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold px-2.5 py-1.5 rounded-xl transition shadow-sm"
+                >
+                  공지 작성
+                </button>
+              </div>
             </div>
 
             <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
@@ -2005,7 +2020,7 @@ export default function Home() {
             <div className="bg-white w-full rounded-3xl p-5 shadow-2xl space-y-4 max-h-[500px] flex flex-col border border-slate-200">
               <div className="flex justify-between items-center border-b pb-3">
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                  <Bell className="w-4 h-4 text-blue-600" /> 전체 공지사항 알림
+                  <Bell className="w-4 h-4 text-blue-600" /> {role === 'admin' ? '공지 목록 관리' : '전체 공지사항 알림'}
                 </h3>
                 <button onClick={() => setShowAnnouncePopup(false)} className="text-slate-400 text-sm font-bold">
                   ✕
@@ -2050,7 +2065,7 @@ export default function Home() {
                 onClick={() => setShowAnnouncePopup(false)}
                 className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-xs"
               >
-                확인 완료
+                {role === 'admin' ? '닫기' : '확인 완료'}
               </button>
             </div>
           </div>
