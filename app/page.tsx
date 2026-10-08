@@ -159,7 +159,15 @@ export default function Home() {
   const hasInitializedWorkerAnnouncements = useRef(false);
 
   const userUniqueKey = `${userName}_${userCode}`;
-  const responseDate = role === 'admin' ? selectedAvailabilityDate : getAvailabilityDateKey();
+  const latestAvailabilityDate = useMemo(() => {
+    return availabilityRecords.reduce((latestDate, record) => {
+      const recordDate = getAvailabilityDateKey(new Date(record.created_at));
+      return recordDate > latestDate ? recordDate : latestDate;
+    }, getAvailabilityDateKey());
+  }, [availabilityRecords]);
+  const responseDate = role === 'admin'
+    ? selectedAvailabilityDate === 'all' ? latestAvailabilityDate : selectedAvailabilityDate
+    : getAvailabilityDateKey();
   const workerResponses = useMemo(() => {
     const responses: { [idKey: string]: 'possible' | 'impossible' | 'none' } = {};
     availabilityRecords.forEach((record) => {
@@ -169,6 +177,29 @@ export default function Home() {
     });
     return responses;
   }, [availabilityRecords, responseDate]);
+  const availabilityByDate = useMemo(() => {
+    const responsesByDate: {
+      [date: string]: { [workerKey: string]: 'possible' | 'impossible' };
+    } = {};
+
+    availabilityRecords.forEach((record) => {
+      const date = getAvailabilityDateKey(new Date(record.created_at));
+      if (!responsesByDate[date]) responsesByDate[date] = {};
+      responsesByDate[date][record.worker_name] = record.status;
+    });
+
+    return Array.from(new Set([getAvailabilityDateKey(), ...Object.keys(responsesByDate)]))
+      .sort((dateA, dateB) => dateB.localeCompare(dateA))
+      .map((date) => {
+        const responses = responsesByDate[date] || {};
+        return {
+          date,
+          responses,
+          possible: Object.keys(responses).filter((workerKey) => responses[workerKey] === 'possible'),
+          impossible: Object.keys(responses).filter((workerKey) => responses[workerKey] === 'impossible'),
+        };
+      });
+  }, [availabilityRecords]);
   const availabilityDates = useMemo(() => {
     const dates = new Set([getAvailabilityDateKey()]);
     availabilityRecords.forEach((record) => dates.add(getAvailabilityDateKey(new Date(record.created_at))));
@@ -1305,7 +1336,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div 
+            <div
               onClick={() => setShowChatModal(true)}
               className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm hover:border-blue-300 transition cursor-pointer space-y-2"
             >
@@ -1490,27 +1521,64 @@ export default function Home() {
                   }}
                   className="min-w-0 bg-slate-800 border border-slate-700 text-white text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400"
                 >
+                  <option value="all">전체 보기</option>
                   {availabilityDates.map((date) => (
                     <option key={date} value={date}>{formatDateLabel(date)}</option>
                   ))}
                 </select>
               </div>
-              <h2 className="text-2xl font-black mb-1">출근 가능 {confirmedCount}명</h2>
-              <p className="text-xs text-slate-400 mb-4">선택한 응답 날짜 기준 · 전체 명단 {targetTotal}명 · 미응답 {pendingCount}명</p>
+              {selectedAvailabilityDate === 'all' ? (
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                  {availabilityByDate.map(({ date, possible, impossible }) => (
+                    <div key={date} className="bg-slate-800 border border-slate-700 rounded-xl p-3">
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <h2 className="text-sm font-black">{formatDateLabel(date)}</h2>
+                        <button
+                          onClick={() => setSelectedAvailabilityDate(date)}
+                          className="text-[10px] font-bold text-blue-300 hover:text-white"
+                        >
+                          자세히 보기
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-slate-300 mb-2">
+                        출근 가능 {possible.length}명 · 출근 불가 {impossible.length}명 · 미응답 {Math.max(targetTotal - possible.length - impossible.length, 0)}명
+                      </p>
+                      {possible.length > 0 && (
+                        <p className="text-[10px] leading-relaxed text-emerald-300">
+                          가능: {possible.map((workerKey) => memberDb[workerKey]?.name || workerKey.split('_')[0]).join(', ')}
+                        </p>
+                      )}
+                      {impossible.length > 0 && (
+                        <p className="text-[10px] leading-relaxed text-rose-300 mt-1">
+                          불가: {impossible.map((workerKey) => memberDb[workerKey]?.name || workerKey.split('_')[0]).join(', ')}
+                        </p>
+                      )}
+                      {possible.length === 0 && impossible.length === 0 && (
+                        <p className="text-[10px] text-slate-400">아직 응답이 없습니다.</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <h2 className="text-2xl font-black mb-1">출근 가능 {confirmedCount}명</h2>
+                  <p className="text-xs text-slate-400 mb-4">선택한 응답 날짜 기준 · 전체 명단 {targetTotal}명 · 미응답 {pendingCount}명</p>
 
-              <div className="w-full bg-slate-800 h-2 rounded-full mb-5 overflow-hidden">
-                <div 
-                  className="bg-blue-500 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${targetTotal > 0 ? Math.min((confirmedCount / targetTotal) * 100, 100) : 0}%` }}
-                ></div>
-              </div>
+                  <div className="w-full bg-slate-800 h-2 rounded-full mb-5 overflow-hidden">
+                    <div
+                      className="bg-blue-500 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${targetTotal > 0 ? Math.min((confirmedCount / targetTotal) * 100, 100) : 0}%` }}
+                    ></div>
+                  </div>
 
-              <button 
-                onClick={() => setShowConfirmedModal(true)}
-                className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold text-sm text-white transition shadow-lg shadow-blue-900/50"
-              >
-                출근 명단 확인 · {formatDateLabel(selectedAvailabilityDate)} ({confirmedCount}명)
-              </button>
+                  <button
+                    onClick={() => setShowConfirmedModal(true)}
+                    className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold text-sm text-white transition shadow-lg shadow-blue-900/50"
+                  >
+                    출근 명단 확인 · {formatDateLabel(selectedAvailabilityDate)} ({confirmedCount}명)
+                  </button>
+                </>
+              )}
             </div>
 
             <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-2xl flex items-center justify-between gap-2">
