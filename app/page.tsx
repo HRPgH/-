@@ -1061,7 +1061,7 @@ export default function Home() {
   const activeViewMode = role === 'admin' ? adminViewTab : 'worker';
 
   return (
-    <div className="min-h-screen bg-slate-100 py-8 px-4 font-sans text-slate-800">
+    <div className="min-h-[100dvh] bg-slate-100 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] font-sans text-slate-800 sm:min-h-screen sm:px-4 sm:py-8">
       {isLoggedIn && role === 'admin' && (
         <div className="max-w-md mx-auto mb-4 flex justify-end items-center text-xs">
           <div className="flex gap-2">
@@ -1090,8 +1090,8 @@ export default function Home() {
         </div>
       )}
 
-      <div className="max-w-md mx-auto bg-slate-50 min-h-[780px] rounded-[3rem] border-[8px] border-slate-900 shadow-2xl overflow-hidden relative p-5">
-        <div className="w-32 h-4 bg-slate-900 mx-auto rounded-b-xl mb-4"></div>
+      <div className="w-full max-w-md mx-auto bg-slate-50 min-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] sm:min-h-[780px] sm:rounded-[3rem] sm:border-[8px] sm:border-slate-900 sm:shadow-2xl overflow-hidden relative p-4 sm:p-5">
+        <div className="hidden sm:block w-32 h-4 bg-slate-900 mx-auto rounded-b-xl mb-4"></div>
 
         {isLoggedIn && role === 'admin' && adminIncomingMessage && (
           <div className="absolute top-8 left-4 right-4 z-40 bg-white border border-blue-200 rounded-2xl shadow-xl p-3">
