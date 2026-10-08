@@ -803,6 +803,17 @@ export default function Home() {
     allKeys.forEach(idKey => { updated[idKey] = !isAllSelected; });
     setSelectedMembers(updated);
   };
+  const toggleSelectMembers = (memberKeys: string[]) => {
+    const shouldSelect = !memberKeys.every((idKey) => selectedMembers[idKey]);
+    setSelectedMembers((previous) => {
+      const updated = { ...previous };
+      memberKeys.forEach((idKey) => {
+        if (shouldSelect) updated[idKey] = true;
+        else delete updated[idKey];
+      });
+      return updated;
+    });
+  };
 
   const handleDownloadSelected = () => {
     const selectedMemberKeys = Object.keys(selectedMembers).filter(
@@ -1709,19 +1720,43 @@ export default function Home() {
                         <div className={`flex items-center justify-between px-2 py-2.5 ${
                           index === 0 ? '' : 'border-t-2 border-slate-200'
                         } ${member.isJoined ? 'bg-emerald-50/70' : 'bg-slate-50/80'}`}>
-                          <div className={`flex items-center gap-1.5 text-[11px] font-bold ${
-                            member.isJoined ? 'text-emerald-800' : 'text-slate-600'
-                          }`}>
-                            {member.isJoined
-                              ? <UserCheck className="w-3.5 h-3.5" />
-                              : <Users className="w-3.5 h-3.5" />}
-                            {member.isJoined ? '입사 완료 인원' : '지원자'}
+                          <div>
+                            <div className={`flex items-center gap-1.5 text-[11px] font-bold ${
+                              member.isJoined ? 'text-emerald-800' : 'text-slate-600'
+                            }`}>
+                              {member.isJoined
+                                ? <UserCheck className="w-3.5 h-3.5" />
+                                : <Users className="w-3.5 h-3.5" />}
+                              {member.isJoined ? '입사 완료 인원' : '지원자'}
+                            </div>
+                            <span className={`text-[10px] font-bold ${
+                              member.isJoined ? 'text-emerald-700' : 'text-slate-500'
+                            }`}>
+                              {member.isJoined ? joinedMemberCount : activeMemberCount}명
+                            </span>
                           </div>
-                          <span className={`text-[10px] font-bold ${
-                            member.isJoined ? 'text-emerald-700' : 'text-slate-500'
-                          }`}>
-                            {member.isJoined ? joinedMemberCount : activeMemberCount}명
-                          </span>
+                          {(() => {
+                            const groupKeys = sortedKeys.filter(
+                              (key) => !!memberDb[key]?.isJoined === !!member.isJoined
+                            );
+                            const selectedGroupCount = groupKeys.filter((key) => selectedMembers[key]).length;
+                            const isGroupSelected = groupKeys.length > 0 && selectedGroupCount === groupKeys.length;
+                            return (
+                              <button
+                                onClick={() => toggleSelectMembers(groupKeys)}
+                                className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition ${
+                                  member.isJoined
+                                    ? 'text-emerald-800 hover:bg-emerald-100'
+                                    : 'text-slate-600 hover:bg-slate-200'
+                                }`}
+                              >
+                                {isGroupSelected
+                                  ? <CheckSquare className="w-3.5 h-3.5" />
+                                  : <Square className="w-3.5 h-3.5" />}
+                                전체 선택 ({selectedGroupCount}/{groupKeys.length})
+                              </button>
+                            );
+                          })()}
                         </div>
                       )}
                       <div className={`py-2.5 flex justify-between items-center text-xs ${
