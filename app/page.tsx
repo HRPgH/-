@@ -83,6 +83,9 @@ interface MemberItem { idKey: string; name: string; code: string; part: string; 
 interface MessageItem { id?: number; sender_name: string; sender_role: 'worker' | 'admin'; receiver_name: string; message: string; is_read?: boolean; created_at?: string; }
 interface AnnouncementItem { id: number; title: string; content: string; created_at: string; }
 interface AvailabilityItem { worker_name: string; status: 'possible' | 'impossible'; created_at: string; }
+type WorkerIncomingNotification =
+  | { type: 'message'; message: MessageItem }
+  | { type: 'announcement'; announcement: AnnouncementItem };
 
 export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
@@ -140,13 +143,20 @@ export default function Home() {
   const [inputMessage, setInputMessage] = useState<string>('');
   const [unreadCounts, setUnreadCounts] = useState<{ [idKey: string]: number }>({});
   const [latestWorkerMessageAt, setLatestWorkerMessageAt] = useState<{ [idKey: string]: string }>({});
+  const [unreadWorkerMessages, setUnreadWorkerMessages] = useState<{ [idKey: string]: MessageItem }>({});
   const [adminIncomingMessage, setAdminIncomingMessage] = useState<MessageItem | null>(null);
+  const [workerIncomingNotification, setWorkerIncomingNotification] = useState<WorkerIncomingNotification | null>(null);
+  const [showAdminNotificationMenu, setShowAdminNotificationMenu] = useState<boolean>(false);
 
   const [activeModal, setActiveModal] = useState<'shuttle' | 'guide' | null>(null);
   const [isFirstLoginGuide, setIsFirstLoginGuide] = useState(false);
   const welcomeMessageRequests = useRef(new Set<string>());
   const seenWorkerMessageIds = useRef(new Set<number>());
   const hasInitializedAdminMessages = useRef(false);
+  const seenAdminMessageIds = useRef(new Set<number>());
+  const hasInitializedWorkerMessages = useRef(false);
+  const seenAnnouncementIds = useRef(new Set<number>());
+  const hasInitializedWorkerAnnouncements = useRef(false);
 
   const userUniqueKey = `${userName}_${userCode}`;
   const responseDate = role === 'admin' ? selectedAvailabilityDate : getAvailabilityDateKey();
@@ -227,10 +237,15 @@ export default function Home() {
       const { data, error } = await supabase.from('messages').select('*').order('created_at', { ascending: true });
       if (data && !error) {
         const counts: { [idKey: string]: number } = {};
+        const latestUnreadWorkerMessages: { [idKey: string]: MessageItem } = {};
         const latestWorkerMessages: { [idKey: string]: string } = {};
         const workerMessages = data.filter(
           (msg: MessageItem): msg is MessageItem & { id: number } =>
             msg.sender_role === 'worker' && typeof msg.id === 'number'
+        );
+        const adminMessagesForWorker = data.filter(
+          (msg: MessageItem): msg is MessageItem & { id: number } =>
+            msg.sender_role === 'admin' && msg.receiver_name === userUniqueKey && typeof msg.id === 'number'
         );
         if (role === 'admin') {
           if (!hasInitializedAdminMessages.current) {
@@ -241,6 +256,16 @@ export default function Home() {
             workerMessages.forEach((msg) => seenWorkerMessageIds.current.add(msg.id));
             const latestNewMessage = newMessages[newMessages.length - 1];
             if (latestNewMessage) setAdminIncomingMessage(latestNewMessage);
+          }
+        } else if (role === 'worker') {
+          if (!hasInitializedWorkerMessages.current) {
+            adminMessagesForWorker.forEach((msg) => seenAdminMessageIds.current.add(msg.id));
+            hasInitializedWorkerMessages.current = true;
+          } else {
+            const newMessages = adminMessagesForWorker.filter((msg) => !seenAdminMessageIds.current.has(msg.id));
+            adminMessagesForWorker.forEach((msg) => seenAdminMessageIds.current.add(msg.id));
+            const latestNewMessage = newMessages[newMessages.length - 1];
+            if (latestNewMessage) setWorkerIncomingNotification({ type: 'message', message: latestNewMessage });
           }
         }
         data.forEach((msg: MessageItem) => {
@@ -254,8 +279,15 @@ export default function Home() {
             if (role === 'admin' && msg.sender_role === 'worker') { counts[msg.sender_name] = (counts[msg.sender_name] || 0) + 1; }
             else if (role === 'worker' && msg.receiver_name === userUniqueKey) { counts['admin'] = (counts['admin'] || 0) + 1; }
           }
+          if (role === 'admin' && msg.sender_role === 'worker' && !msg.is_read) {
+            const latestUnread = latestUnreadWorkerMessages[msg.sender_name];
+            if (!latestUnread?.created_at || (msg.created_at && msg.created_at > latestUnread.created_at)) {
+              latestUnreadWorkerMessages[msg.sender_name] = msg;
+            }
+          }
         });
         setUnreadCounts(counts);
+        setUnreadWorkerMessages(latestUnreadWorkerMessages);
         setLatestWorkerMessageAt(latestWorkerMessages);
 
         const currentTarget = role === 'admin' ? chatTargetWorkerKey : userUniqueKey;
@@ -271,6 +303,18 @@ export default function Home() {
       const { data, error } = await supabase.from('announcements').select('*').order('created_at', { ascending: false });
       if (data && !error) {
         setAnnouncements(data);
+        if (role === 'worker') {
+          if (!hasInitializedWorkerAnnouncements.current) {
+            data.forEach((announcement: AnnouncementItem) => seenAnnouncementIds.current.add(announcement.id));
+            hasInitializedWorkerAnnouncements.current = true;
+          } else {
+            const newAnnouncement = data.find((announcement: AnnouncementItem) => !seenAnnouncementIds.current.has(announcement.id));
+            data.forEach((announcement: AnnouncementItem) => seenAnnouncementIds.current.add(announcement.id));
+            if (newAnnouncement) {
+              setWorkerIncomingNotification({ type: 'announcement', announcement: newAnnouncement });
+            }
+          }
+        }
         const lastReadId = localStorage.getItem(`read_announcement_${userUniqueKey}`);
         setHasUnreadAnnounce(data.length > 0 && String(data[0].id) !== lastReadId);
       }
@@ -300,6 +344,7 @@ export default function Home() {
 
   const openAnnouncementBell = () => {
     setShowNotificationMenu(false);
+    setShowAdminNotificationMenu(false);
     setShowAnnouncePopup(true);
     setHasUnreadAnnounce(false);
     if (announcements.length > 0) { localStorage.setItem(`read_announcement_${userUniqueKey}`, String(announcements[0].id)); }
@@ -1014,6 +1059,56 @@ export default function Home() {
           </div>
         )}
 
+        {isLoggedIn && role === 'worker' && workerIncomingNotification && (
+          <div className={`absolute top-8 left-4 right-4 z-40 bg-white rounded-2xl shadow-xl p-3 border ${
+            workerIncomingNotification.type === 'announcement' ? 'border-amber-200' : 'border-blue-200'
+          }`}>
+            <div className="flex items-start gap-2.5">
+              <span className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                workerIncomingNotification.type === 'announcement' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+              }`}>
+                {workerIncomingNotification.type === 'announcement'
+                  ? <Megaphone className="w-4 h-4" />
+                  : <MessageSquare className="w-4 h-4" />}
+              </span>
+              <button
+                onClick={() => {
+                  if (workerIncomingNotification.type === 'announcement') {
+                    openAnnouncementBell();
+                  } else {
+                    setShowChatModal(true);
+                  }
+                  setWorkerIncomingNotification(null);
+                }}
+                className="min-w-0 flex-1 text-left"
+              >
+                <span className={`block text-[11px] font-bold ${
+                  workerIncomingNotification.type === 'announcement' ? 'text-amber-700' : 'text-blue-700'
+                }`}>
+                  {workerIncomingNotification.type === 'announcement'
+                    ? `새 공지사항 · ${workerIncomingNotification.announcement.title}`
+                    : '새 상담 메시지'}
+                </span>
+                <span className="block text-xs text-slate-600 truncate mt-0.5">
+                  {workerIncomingNotification.type === 'announcement'
+                    ? workerIncomingNotification.announcement.content
+                    : workerIncomingNotification.message.message}
+                </span>
+                <span className={`block text-[10px] font-bold mt-1 ${
+                  workerIncomingNotification.type === 'announcement' ? 'text-amber-600' : 'text-blue-600'
+                }`}>눌러서 확인하기</span>
+              </button>
+              <button
+                onClick={() => setWorkerIncomingNotification(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+                aria-label="알림 닫기"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         <input
           type="file"
           ref={fileInputRef}
@@ -1304,12 +1399,65 @@ export default function Home() {
                 >
                   <UserCog className="w-4 h-4 text-emerald-400" />
                 </button>
-                <button
-                  onClick={openAnnouncementBell}
-                  className="relative bg-white p-2 rounded-full border border-slate-200 shadow-sm"
-                >
-                  <Bell className="w-4 h-4 text-slate-600" />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowAdminNotificationMenu((isOpen) => !isOpen)}
+                    className="relative bg-white p-2 rounded-full border border-slate-200 shadow-sm"
+                    title="지원자 메시지 알림"
+                    aria-label="지원자 메시지 알림"
+                    aria-expanded={showAdminNotificationMenu}
+                  >
+                    <Bell className={`w-4 h-4 text-slate-600 ${totalAdminUnread > 0 ? 'animate-pulse' : ''}`} />
+                    {totalAdminUnread > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                        {totalAdminUnread > 9 ? '9+' : totalAdminUnread}
+                      </span>
+                    )}
+                  </button>
+                  {showAdminNotificationMenu && (
+                    <div className="absolute right-0 top-11 z-30 w-64 bg-white rounded-2xl border border-slate-200 shadow-xl p-2 space-y-1">
+                      <p className="px-2 py-1 text-[10px] font-bold text-slate-400">새 알림</p>
+                      <div className="max-h-48 overflow-y-auto">
+                        {Object.entries(unreadWorkerMessages)
+                          .sort(([, messageA], [, messageB]) =>
+                            (messageB.created_at || '').localeCompare(messageA.created_at || '')
+                          )
+                          .map(([workerKey, message]) => (
+                            <button
+                              key={workerKey}
+                              onClick={() => {
+                                setShowAdminNotificationMenu(false);
+                                openChatWithWorker(workerKey);
+                              }}
+                              className="w-full text-left p-2.5 rounded-xl hover:bg-blue-50 transition"
+                            >
+                              <span className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-slate-700 truncate">
+                                  {memberDb[workerKey]?.name || workerKey.split('_')[0]}
+                                </span>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500 text-white shrink-0">
+                                  {unreadCounts[workerKey] || 0}
+                                </span>
+                              </span>
+                              <span className="block text-[10px] text-slate-500 truncate mt-0.5">{message.message}</span>
+                            </button>
+                          ))}
+                        {totalAdminUnread === 0 && (
+                          <p className="px-2 py-3 text-xs text-slate-400 text-center">새 지원자 메시지가 없습니다.</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowAdminNotificationMenu(false);
+                          openAnnouncementBell();
+                        }}
+                        className="w-full flex items-center gap-2 text-left p-2.5 rounded-xl hover:bg-amber-50 transition text-xs font-bold text-slate-700"
+                      >
+                        <Megaphone className="w-4 h-4 text-amber-500" /> 공지사항 보기
+                      </button>
+                    </div>
+                  )}
+                </div>
                 <button
                   onClick={handleLogout}
                   className="bg-white p-2 rounded-full border border-slate-200 shadow-sm text-slate-600 hover:text-red-500"
