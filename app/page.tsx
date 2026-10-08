@@ -98,6 +98,7 @@ export default function Home() {
   const [adminDb, setAdminDb] = useState<{ [key: string]: true }>({});
 
   const [memberSearchTerm, setMemberSearchTerm] = useState<string>('');
+  const [adminMemberTab, setAdminMemberTab] = useState<'applicants' | 'joined'>('applicants');
   const [showAdminManageModal, setShowAdminManageModal] = useState<boolean>(false);
   const [newAdminName, setNewAdminName] = useState<string>('');
   const [newAdminPassword, setNewAdminPassword] = useState<string>('');
@@ -797,11 +798,18 @@ export default function Home() {
 
   const toggleSelectMember = (idKey: string) => { setSelectedMembers(prev => ({ ...prev, [idKey]: !prev[idKey] })); };
   const toggleSelectAll = () => {
-    const allKeys = Object.keys(memberDb);
-    const isAllSelected = allKeys.every(idKey => selectedMembers[idKey]);
-    const updated: { [idKey: string]: boolean } = {};
-    allKeys.forEach(idKey => { updated[idKey] = !isAllSelected; });
-    setSelectedMembers(updated);
+    const tabKeys = Object.keys(memberDb).filter(
+      (idKey) => !!memberDb[idKey]?.isJoined === (adminMemberTab === 'joined')
+    );
+    const isAllSelected = tabKeys.length > 0 && tabKeys.every(idKey => selectedMembers[idKey]);
+    setSelectedMembers((previous) => {
+      const updated = { ...previous };
+      tabKeys.forEach((idKey) => {
+        if (isAllSelected) delete updated[idKey];
+        else updated[idKey] = true;
+      });
+      return updated;
+    });
   };
   const toggleSelectMembers = (memberKeys: string[]) => {
     const shouldSelect = !memberKeys.every((idKey) => selectedMembers[idKey]);
@@ -1029,10 +1037,17 @@ export default function Home() {
     if (rankA !== rankB) return rankA - rankB;
     return (itemA?.name || '').localeCompare(itemB?.name || '');
   });
-  const activeMemberCount = sortedKeys.filter((idKey) => !memberDb[idKey]?.isJoined).length;
-  const joinedMemberCount = sortedKeys.filter((idKey) => memberDb[idKey]?.isJoined).length;
+  const activeMemberCount = allKeys.filter((idKey) => !memberDb[idKey]?.isJoined).length;
+  const joinedMemberCount = allKeys.filter((idKey) => memberDb[idKey]?.isJoined).length;
+  const currentTabMemberKeys = allKeys.filter(
+    (idKey) => !!memberDb[idKey]?.isJoined === (adminMemberTab === 'joined')
+  );
+  const currentTabSelectedCount = currentTabMemberKeys.filter((idKey) => selectedMembers[idKey]).length;
+  const visibleMemberKeys = sortedKeys.filter((idKey) =>
+    adminMemberTab === 'joined' ? !!memberDb[idKey]?.isJoined : !memberDb[idKey]?.isJoined
+  );
 
-  const isAllChecked = allKeys.length > 0 && allKeys.every(idKey => selectedMembers[idKey]);
+  const isAllChecked = currentTabMemberKeys.length > 0 && currentTabSelectedCount === currentTabMemberKeys.length;
   const selectedCount = Object.values(selectedMembers).filter(Boolean).length;
 
   const confirmedList = allKeys.filter(idKey => workerResponses[idKey] === 'possible');
@@ -1638,6 +1653,31 @@ export default function Home() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+                <button
+                  onClick={() => setAdminMemberTab('applicants')}
+                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition ${
+                    adminMemberTab === 'applicants'
+                      ? 'bg-white text-blue-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  지원자 ({activeMemberCount})
+                </button>
+                <button
+                  onClick={() => setAdminMemberTab('joined')}
+                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition ${
+                    adminMemberTab === 'joined'
+                      ? 'bg-white text-emerald-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  입사 완료 ({joinedMemberCount})
+                </button>
+              </div>
+
               <div className="relative">
                 <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
                 <input
@@ -1667,7 +1707,7 @@ export default function Home() {
                   ) : (
                     <Square className="w-4 h-4 text-slate-400" />
                   )}
-                  <span>선택 ({selectedCount}/{allKeys.length})</span>
+                  <span>{adminMemberTab === 'joined' ? '입사 완료' : '지원자'} 전체 선택 ({currentTabSelectedCount}/{currentTabMemberKeys.length})</span>
                 </button>
 
                 <div className="flex items-center gap-1.5">
@@ -1700,12 +1740,16 @@ export default function Home() {
               </div>
 
               <div className="divide-y divide-slate-100 max-h-56 overflow-y-auto">
-                {sortedKeys.length === 0 ? (
+                {visibleMemberKeys.length === 0 ? (
                   <div className="text-center py-8 text-slate-400 text-xs font-medium">
-                    {memberSearchTerm ? `'${memberSearchTerm}' 검색 결과가 없습니다.` : '등록된 지원자가 없습니다.'}
+                    {memberSearchTerm
+                      ? `'${memberSearchTerm}' 검색 결과가 없습니다.`
+                      : adminMemberTab === 'joined'
+                      ? '입사 완료 인원이 없습니다.'
+                      : '등록된 지원자가 없습니다.'}
                   </div>
                 ) : (
-                  sortedKeys.map((idKey, index) => {
+                  visibleMemberKeys.map((idKey, index) => {
                     const member = memberDb[idKey];
                     if (!member) return null;
 
@@ -1716,7 +1760,7 @@ export default function Home() {
 
                     return (
                       <React.Fragment key={idKey}>
-                      {(index === 0 || !!memberDb[sortedKeys[index - 1]]?.isJoined !== !!member.isJoined) && (
+                      {(index === 0 || !!memberDb[visibleMemberKeys[index - 1]]?.isJoined !== !!member.isJoined) && (
                         <div className={`flex items-center justify-between px-2 py-2.5 ${
                           index === 0 ? '' : 'border-t-2 border-slate-200'
                         } ${member.isJoined ? 'bg-emerald-50/70' : 'bg-slate-50/80'}`}>
