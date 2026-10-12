@@ -79,7 +79,7 @@ function getBotResponse(userMsg: string): string {
   return '🤖 말씀해 주신 내용은 챗봇으로 답변하기 어렵습니다.\n\n상세한 문의 사항은 담당 관리자 번호(☎️ 054-450-8618)로 연락 주시면 친절히 안내해 드리겠습니다!';
 }
 
-interface MemberItem { idKey: string; name: string; code: string; part: string; isJoined?: boolean; isOnline?: boolean; lastLoginAt?: string | null; }
+interface MemberItem { idKey: string; name: string; code: string; part: string; isJoined?: boolean; isNoShow?: boolean; isOnline?: boolean; lastLoginAt?: string | null; }
 interface MessageItem { id?: number; sender_name: string; sender_role: 'worker' | 'admin'; receiver_name: string; message: string; is_read?: boolean; created_at?: string; }
 interface AnnouncementItem { id: number; title: string; content: string; created_at: string; }
 interface AvailabilityItem { worker_name: string; status: 'possible' | 'impossible'; created_at: string; }
@@ -98,7 +98,7 @@ export default function Home() {
   const [adminDb, setAdminDb] = useState<{ [key: string]: true }>({});
 
   const [memberSearchTerm, setMemberSearchTerm] = useState<string>('');
-  const [adminMemberTab, setAdminMemberTab] = useState<'applicants' | 'joined'>('applicants');
+  const [adminMemberTab, setAdminMemberTab] = useState<'applicants' | 'joined' | 'noShow'>('applicants');
   const [memberConnectionFilter, setMemberConnectionFilter] = useState<'all' | 'recorded' | 'online' | 'offline'>('all');
   const [showAdminManageModal, setShowAdminManageModal] = useState<boolean>(false);
   const [newAdminName, setNewAdminName] = useState<string>('');
@@ -240,7 +240,8 @@ export default function Home() {
           const idKey = `${item.name}_${item.code}`;
           dbMap[idKey] = {
             idKey, name: item.name, code: item.code, part: item.part,
-            isJoined: item.is_joined === true, isOnline: item.is_online === true, lastLoginAt: item.last_login_at
+            isJoined: item.is_joined === true, isNoShow: item.is_no_show === true,
+            isOnline: item.is_online === true, lastLoginAt: item.last_login_at
           };
         });
         setMemberDb(dbMap);
@@ -565,8 +566,28 @@ export default function Home() {
     const target = memberDb[idKey];
     if (!target || !supabase) return;
     const nextStatus = !target.isJoined;
-    await supabase.from('members').update({ is_joined: nextStatus }).match({ name: target.name, code: target.code });
-    fetchMembers();
+    const { error } = await supabase.from('members')
+      .update({ is_joined: nextStatus, is_no_show: false })
+      .match({ name: target.name, code: target.code });
+    if (error) {
+      alert(`입사 상태 변경에 실패했습니다: ${error.message}`);
+      return;
+    }
+    await fetchMembers();
+  };
+
+  const toggleNoShowStatus = async (idKey: string) => {
+    const target = memberDb[idKey];
+    if (!target || !supabase) return;
+    const nextStatus = !target.isNoShow;
+    const { error } = await supabase.from('members')
+      .update({ is_no_show: nextStatus, is_joined: false })
+      .match({ name: target.name, code: target.code });
+    if (error) {
+      alert(`노쇼 상태 변경에 실패했습니다: ${error.message}`);
+      return;
+    }
+    await fetchMembers();
   };
 
   const handleSendGroupMessage = async (e: React.FormEvent) => {
@@ -800,9 +821,7 @@ export default function Home() {
 
   const toggleSelectMember = (idKey: string) => { setSelectedMembers(prev => ({ ...prev, [idKey]: !prev[idKey] })); };
   const toggleSelectAll = () => {
-    const tabKeys = Object.keys(memberDb).filter(
-      (idKey) => !!memberDb[idKey]?.isJoined === (adminMemberTab === 'joined')
-    );
+    const tabKeys = currentTabMemberKeys;
     const isAllSelected = tabKeys.length > 0 && tabKeys.every(idKey => selectedMembers[idKey]);
     setSelectedMembers((previous) => {
       const updated = { ...previous };
@@ -1060,11 +1079,14 @@ export default function Home() {
     if (rankA !== rankB) return rankA - rankB;
     return (itemA?.name || '').localeCompare(itemB?.name || '');
   });
-  const activeMemberCount = allKeys.filter((idKey) => !memberDb[idKey]?.isJoined).length;
+  const activeMemberCount = allKeys.filter(
+    (idKey) => !memberDb[idKey]?.isJoined && !memberDb[idKey]?.isNoShow
+  ).length;
   const joinedMemberCount = allKeys.filter((idKey) => memberDb[idKey]?.isJoined).length;
-  const currentTabMemberKeys = allKeys.filter(
-    (idKey) => !!memberDb[idKey]?.isJoined === (adminMemberTab === 'joined')
-  );
+  const noShowMemberCount = allKeys.filter((idKey) => memberDb[idKey]?.isNoShow).length;
+  const getMemberCategory = (member?: MemberItem) =>
+    member?.isJoined ? 'joined' : member?.isNoShow ? 'noShow' : 'applicants';
+  const currentTabMemberKeys = allKeys.filter((idKey) => getMemberCategory(memberDb[idKey]) === adminMemberTab);
   const memberConnectionCounts = {
     all: currentTabMemberKeys.length,
     recorded: currentTabMemberKeys.filter((idKey) => !memberDb[idKey]?.isOnline && !!memberDb[idKey]?.lastLoginAt).length,
@@ -1073,7 +1095,7 @@ export default function Home() {
   };
   const currentTabSelectedCount = currentTabMemberKeys.filter((idKey) => selectedMembers[idKey]).length;
   const visibleMemberKeys = sortedKeys.filter((idKey) =>
-    adminMemberTab === 'joined' ? !!memberDb[idKey]?.isJoined : !memberDb[idKey]?.isJoined
+    getMemberCategory(memberDb[idKey]) === adminMemberTab
   ).filter((idKey) => {
     const member = memberDb[idKey];
     if (!member) return false;
@@ -1699,7 +1721,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl">
+              <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl">
                 <button
                   onClick={() => setAdminMemberTab('applicants')}
                   className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition ${
@@ -1708,8 +1730,8 @@ export default function Home() {
                       : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
-                  <Users className="w-3.5 h-3.5" />
-                  지원자 ({activeMemberCount})
+                  <Users className="w-3.5 h-3.5 shrink-0" />
+                  <span>지원자 ({activeMemberCount})</span>
                 </button>
                 <button
                   onClick={() => setAdminMemberTab('joined')}
@@ -1719,8 +1741,19 @@ export default function Home() {
                       : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
-                  <UserCheck className="w-3.5 h-3.5" />
-                  입사 완료 ({joinedMemberCount})
+                  <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                  <span>입사 ({joinedMemberCount})</span>
+                </button>
+                <button
+                  onClick={() => setAdminMemberTab('noShow')}
+                  className={`flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-bold transition ${
+                    adminMemberTab === 'noShow'
+                      ? 'bg-white text-rose-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  <span>노쇼 ({noShowMemberCount})</span>
                 </button>
               </div>
 
@@ -1776,7 +1809,10 @@ export default function Home() {
                   ) : (
                     <Square className="w-4 h-4 text-slate-400" />
                   )}
-                  <span>{adminMemberTab === 'joined' ? '입사 완료' : '지원자'} 전체 선택 ({currentTabSelectedCount}/{currentTabMemberKeys.length})</span>
+                  <span>
+                    {adminMemberTab === 'joined' ? '입사 완료' : adminMemberTab === 'noShow' ? '노쇼' : '지원자'}
+                    {' '}전체 선택 ({currentTabSelectedCount}/{currentTabMemberKeys.length})
+                  </span>
                 </button>
 
                 <div className="flex items-center gap-1.5">
@@ -1817,6 +1853,8 @@ export default function Home() {
                       ? '선택한 접속 상태의 인원이 없습니다.'
                       : adminMemberTab === 'joined'
                       ? '입사 완료 인원이 없습니다.'
+                      : adminMemberTab === 'noShow'
+                      ? '노쇼로 표시된 인원이 없습니다.'
                       : '등록된 지원자가 없습니다.'}
                   </div>
                 ) : (
@@ -1828,40 +1866,57 @@ export default function Home() {
                     const workerStatus = workerResponses[idKey] || 'none';
                     const isChecked = !!selectedMembers[idKey];
                     const online = member.isOnline === true;
+                    const memberCategory = getMemberCategory(member);
 
                     return (
                       <React.Fragment key={idKey}>
-                      {(index === 0 || !!memberDb[visibleMemberKeys[index - 1]]?.isJoined !== !!member.isJoined) && (
+                      {(index === 0 || getMemberCategory(memberDb[visibleMemberKeys[index - 1]]) !== memberCategory) && (
                         <div className={`flex items-center justify-between px-2 py-2.5 ${
                           index === 0 ? '' : 'border-t-2 border-slate-200'
-                        } ${member.isJoined ? 'bg-emerald-50/70' : 'bg-slate-50/80'}`}>
+                        } ${
+                          memberCategory === 'joined'
+                            ? 'bg-emerald-50/70'
+                            : memberCategory === 'noShow'
+                            ? 'bg-rose-50/70'
+                            : 'bg-slate-50/80'
+                        }`}>
                           <div>
                             <div className={`flex items-center gap-1.5 text-[11px] font-bold ${
-                              member.isJoined ? 'text-emerald-800' : 'text-slate-600'
+                              memberCategory === 'joined'
+                                ? 'text-emerald-800'
+                                : memberCategory === 'noShow'
+                                ? 'text-rose-800'
+                                : 'text-slate-600'
                             }`}>
-                              {member.isJoined
+                              {memberCategory === 'joined'
                                 ? <UserCheck className="w-3.5 h-3.5" />
+                                : memberCategory === 'noShow'
+                                ? <AlertTriangle className="w-3.5 h-3.5" />
                                 : <Users className="w-3.5 h-3.5" />}
-                              {member.isJoined ? '입사 완료 인원' : '지원자'}
+                              {memberCategory === 'joined' ? '입사 완료 인원' : memberCategory === 'noShow' ? '노쇼 인원' : '지원자'}
                             </div>
                             <span className={`text-[10px] font-bold ${
-                              member.isJoined ? 'text-emerald-700' : 'text-slate-500'
+                              memberCategory === 'joined'
+                                ? 'text-emerald-700'
+                                : memberCategory === 'noShow'
+                                ? 'text-rose-700'
+                                : 'text-slate-500'
                             }`}>
-                              {member.isJoined ? joinedMemberCount : activeMemberCount}명
+                              {memberCategory === 'joined' ? joinedMemberCount : memberCategory === 'noShow' ? noShowMemberCount : activeMemberCount}명
                             </span>
                           </div>
                           {(() => {
-                            const groupKeys = sortedKeys.filter(
-                              (key) => !!memberDb[key]?.isJoined === !!member.isJoined
-                            );
+                            const groupKeys = currentTabMemberKeys;
                             const selectedGroupCount = groupKeys.filter((key) => selectedMembers[key]).length;
                             const isGroupSelected = groupKeys.length > 0 && selectedGroupCount === groupKeys.length;
                             return (
                               <button
                                 onClick={() => toggleSelectMembers(groupKeys)}
                                 className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition ${
-                                  member.isJoined
+                                  memberCategory === 'joined'
                                     ? 'text-emerald-800 hover:bg-emerald-100'
+                                    : memberCategory === 'noShow'
+                                    ? 'text-rose-800 hover:bg-rose-100'
                                     : 'text-slate-600 hover:bg-slate-200'
                                 }`}
                               >
@@ -1875,7 +1930,7 @@ export default function Home() {
                         </div>
                       )}
                       <div className={`py-2.5 flex justify-between items-center text-xs ${
-                        member.isJoined ? 'bg-emerald-50/30' : ''
+                        memberCategory === 'joined' ? 'bg-emerald-50/30' : memberCategory === 'noShow' ? 'bg-rose-50/30' : ''
                       }`}>
                         <div className="flex items-center gap-2">
                           <button onClick={() => toggleSelectMember(idKey)} className="text-slate-400">
@@ -1924,6 +1979,11 @@ export default function Home() {
                                   <UserCheck className="w-3 h-3" /> 입사완료
                                 </span>
                               )}
+                              {member.isNoShow && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white shadow-sm flex items-center gap-0.5">
+                                  <AlertTriangle className="w-3 h-3" /> 노쇼
+                                </span>
+                              )}
                               
                               {workerStatus === 'impossible' && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200/60">
@@ -1940,10 +2000,10 @@ export default function Home() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex flex-wrap items-center justify-end gap-1">
                           <button
                             onClick={() => toggleJoinStatus(idKey)}
-                            className={`font-bold px-2 py-1.5 rounded-xl text-[11px] transition ${
+                            className={`font-bold px-1.5 py-1.5 rounded-xl text-[10px] transition ${
                               member.isJoined
                                 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                                 : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600'
@@ -1951,6 +2011,18 @@ export default function Home() {
                             title="입사 상태 변경"
                           >
                             {member.isJoined ? '입사완료' : '입사'}
+                          </button>
+
+                          <button
+                            onClick={() => toggleNoShowStatus(idKey)}
+                            className={`font-bold px-1.5 py-1.5 rounded-xl text-[10px] transition ${
+                              member.isNoShow
+                                ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600'
+                            }`}
+                            title="노쇼 상태 변경"
+                          >
+                            {member.isNoShow ? '노쇼 해제' : '노쇼'}
                           </button>
 
                           <button

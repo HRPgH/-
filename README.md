@@ -18,6 +18,10 @@ npm run dev
 
 GitHub에 코드를 공개하거나 웹앱을 배포하기 전에 Supabase SQL Editor에서 [`supabase/migrations/20261008_secure_admin_login.sql`](./supabase/migrations/20261008_secure_admin_login.sql)을 실행하고 배포해야 합니다. 이 설정은 브라우저에서 관리자 비밀번호를 직접 읽지 못하게 하지만, 앱의 다른 Supabase 테이블 권한까지 모두 보호하는 것은 아닙니다. 실제 데이터가 연결된 공개 배포 전에는 각 테이블의 Row Level Security 정책과 권한도 별도로 검토하세요.
 
+## 노쇼 명단 사용 설정
+
+관리자 화면에서 노쇼 상태를 저장하려면 Supabase SQL Editor에서 [`supabase/migrations/20261012_member_no_show.sql`](./supabase/migrations/20261012_member_no_show.sql)을 실행하세요. 실행 후 관리자 명단의 `노쇼` 탭에서 노쇼 인원을 확인할 수 있습니다. 노쇼로 표시하면 지원자 명단에서 분리되고, 노쇼 상태 변경을 취소하거나 입사 완료로 표시하면 다른 해당 명단으로 이동합니다.
+
 ## Android 테스트 앱
 
 Android 앱은 웹 화면을 APK에 포함합니다. 로그인, 명단, 대화 등 Supabase 기능을 사용하려면 휴대폰이 인터넷에 연결되어 있어야 합니다.
