@@ -79,7 +79,7 @@ function getBotResponse(userMsg: string): string {
   return '🤖 말씀해 주신 내용은 챗봇으로 답변하기 어렵습니다.\n\n상세한 문의 사항은 담당 관리자 번호(☎️ 054-450-8618)로 연락 주시면 친절히 안내해 드리겠습니다!';
 }
 
-interface MemberItem { idKey: string; name: string; code: string; part: string; isJoined?: boolean; isNoShow?: boolean; withdrawnAt?: string | null; isOnline?: boolean; lastLoginAt?: string | null; }
+interface MemberItem { idKey: string; name: string; code: string; part: string; isJoined?: boolean; isNoShow?: boolean; resignedAt?: string | null; withdrawnAt?: string | null; isOnline?: boolean; lastLoginAt?: string | null; }
 interface MessageItem { id?: number; sender_name: string; sender_role: 'worker' | 'admin'; receiver_name: string; message: string; is_read?: boolean; created_at?: string; }
 interface AnnouncementItem { id: number; title: string; content: string; created_at: string; }
 interface AvailabilityItem { worker_name: string; status: 'possible' | 'impossible'; created_at: string; }
@@ -98,7 +98,7 @@ export default function Home() {
   const [adminDb, setAdminDb] = useState<{ [key: string]: true }>({});
 
   const [memberSearchTerm, setMemberSearchTerm] = useState<string>('');
-  const [adminMemberTab, setAdminMemberTab] = useState<'applicants' | 'joined' | 'noShow' | 'withdrawn'>('applicants');
+  const [adminMemberTab, setAdminMemberTab] = useState<'applicants' | 'joined' | 'resigned' | 'noShow' | 'withdrawn'>('applicants');
   const [memberConnectionFilter, setMemberConnectionFilter] = useState<'all' | 'recorded' | 'online' | 'offline'>('all');
   const [showAdminManageModal, setShowAdminManageModal] = useState<boolean>(false);
   const [newAdminName, setNewAdminName] = useState<string>('');
@@ -263,6 +263,7 @@ export default function Home() {
           dbMap[idKey] = {
             idKey, name: item.name, code: item.code, part: item.part,
             isJoined: item.is_joined === true, isNoShow: item.is_no_show === true,
+            resignedAt: item.resigned_at || null,
             withdrawnAt: item.withdrawn_at || null,
             isOnline: item.is_online === true, lastLoginAt: item.last_login_at
           };
@@ -610,7 +611,7 @@ export default function Home() {
     const target = memberDb[idKey];
     if (!target || !supabase) return;
     const { error } = await supabase.from('members')
-      .update({ withdrawn_at: null, is_joined: false, is_no_show: false })
+      .update({ withdrawn_at: null, resigned_at: null, is_joined: false, is_no_show: false })
       .match({ name: target.name, code: target.code });
     if (error) {
       alert(`탈퇴 상태 해제에 실패했습니다: ${error.message}`);
@@ -624,10 +625,28 @@ export default function Home() {
     if (!target || !supabase) return;
     const nextStatus = !target.isJoined;
     const { error } = await supabase.from('members')
-      .update({ is_joined: nextStatus, is_no_show: false })
+      .update({ is_joined: nextStatus, is_no_show: false, resigned_at: null })
       .match({ name: target.name, code: target.code });
     if (error) {
       alert(`입사 상태 변경에 실패했습니다: ${error.message}`);
+      return;
+    }
+    await fetchMembers();
+  };
+
+  const toggleResignedStatus = async (idKey: string) => {
+    const target = memberDb[idKey];
+    if (!target || !supabase) return;
+    const isResigning = !target.resignedAt;
+    const { error } = await supabase.from('members')
+      .update({
+        is_joined: false,
+        is_no_show: false,
+        resigned_at: isResigning ? new Date().toISOString() : null,
+      })
+      .match({ name: target.name, code: target.code });
+    if (error) {
+      alert(`퇴사 상태 변경에 실패했습니다: ${error.message}`);
       return;
     }
     await fetchMembers();
@@ -638,7 +657,7 @@ export default function Home() {
     if (!target || !supabase) return;
     const nextStatus = !target.isNoShow;
     const { error } = await supabase.from('members')
-      .update({ is_no_show: nextStatus, is_joined: false })
+      .update({ is_no_show: nextStatus, is_joined: false, resigned_at: null })
       .match({ name: target.name, code: target.code });
     if (error) {
       alert(`노쇼 상태 변경에 실패했습니다: ${error.message}`);
@@ -920,7 +939,7 @@ export default function Home() {
         성명: member.name,
         코드: member.code,
         근무파트: member.part,
-        입사상태: member.withdrawnAt ? '탈퇴' : member.isJoined ? '입사완료' : member.isNoShow ? '노쇼' : '지원자',
+        입사상태: member.withdrawnAt ? '탈퇴' : member.resignedAt ? '퇴사' : member.isJoined ? '입사완료' : member.isNoShow ? '노쇼' : '지원자',
         접속상태: member.isOnline ? '접속중' : member.lastLoginAt ? '기록' : '미접속',
         최근접속: member.lastLoginAt || '',
       };
@@ -1141,13 +1160,14 @@ export default function Home() {
     return (itemA?.name || '').localeCompare(itemB?.name || '');
   });
   const activeMemberCount = allKeys.filter(
-    (idKey) => !memberDb[idKey]?.withdrawnAt && !memberDb[idKey]?.isJoined && !memberDb[idKey]?.isNoShow
+    (idKey) => !memberDb[idKey]?.withdrawnAt && !memberDb[idKey]?.resignedAt && !memberDb[idKey]?.isJoined && !memberDb[idKey]?.isNoShow
   ).length;
   const joinedMemberCount = allKeys.filter((idKey) => !memberDb[idKey]?.withdrawnAt && memberDb[idKey]?.isJoined).length;
+  const resignedMemberCount = allKeys.filter((idKey) => !memberDb[idKey]?.withdrawnAt && !!memberDb[idKey]?.resignedAt).length;
   const noShowMemberCount = allKeys.filter((idKey) => !memberDb[idKey]?.withdrawnAt && memberDb[idKey]?.isNoShow).length;
   const withdrawnMemberCount = allKeys.filter((idKey) => !!memberDb[idKey]?.withdrawnAt).length;
   const getMemberCategory = (member?: MemberItem) =>
-    member?.withdrawnAt ? 'withdrawn' : member?.isJoined ? 'joined' : member?.isNoShow ? 'noShow' : 'applicants';
+    member?.withdrawnAt ? 'withdrawn' : member?.resignedAt ? 'resigned' : member?.isJoined ? 'joined' : member?.isNoShow ? 'noShow' : 'applicants';
   const currentTabMemberKeys = allKeys.filter((idKey) => getMemberCategory(memberDb[idKey]) === adminMemberTab);
   const memberConnectionCounts = {
     all: currentTabMemberKeys.length,
@@ -1807,6 +1827,17 @@ export default function Home() {
                   <span>입사 ({joinedMemberCount})</span>
                 </button>
                 <button
+                  onClick={() => setAdminMemberTab('resigned')}
+                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition ${
+                    adminMemberTab === 'resigned'
+                      ? 'bg-white text-orange-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <UserMinus className="w-3.5 h-3.5 shrink-0" />
+                  <span>퇴사 ({resignedMemberCount})</span>
+                </button>
+                <button
                   onClick={() => setAdminMemberTab('noShow')}
                   className={`flex items-center justify-center gap-1 py-2 rounded-lg text-[11px] font-bold transition ${
                     adminMemberTab === 'noShow'
@@ -1885,6 +1916,8 @@ export default function Home() {
                   <span>
                     {adminMemberTab === 'joined'
                       ? '입사 완료'
+                      : adminMemberTab === 'resigned'
+                      ? '퇴사'
                       : adminMemberTab === 'noShow'
                       ? '노쇼'
                       : adminMemberTab === 'withdrawn'
@@ -1937,6 +1970,8 @@ export default function Home() {
                       ? '선택한 접속 상태의 인원이 없습니다.'
                       : adminMemberTab === 'joined'
                       ? '입사 완료 인원이 없습니다.'
+                      : adminMemberTab === 'resigned'
+                      ? '퇴사 처리된 인원이 없습니다.'
                       : adminMemberTab === 'noShow'
                       ? '노쇼로 표시된 인원이 없습니다.'
                       : adminMemberTab === 'withdrawn'
@@ -1962,6 +1997,8 @@ export default function Home() {
                         } ${
                           memberCategory === 'joined'
                             ? 'bg-emerald-50/70'
+                            : memberCategory === 'resigned'
+                            ? 'bg-orange-50/70'
                             : memberCategory === 'noShow'
                             ? 'bg-rose-50/70'
                             : memberCategory === 'withdrawn'
@@ -1972,6 +2009,8 @@ export default function Home() {
                             <div className={`flex items-center gap-1.5 text-[11px] font-bold ${
                               memberCategory === 'joined'
                                 ? 'text-emerald-800'
+                                : memberCategory === 'resigned'
+                                ? 'text-orange-800'
                                 : memberCategory === 'noShow'
                                 ? 'text-rose-800'
                                 : memberCategory === 'withdrawn'
@@ -1980,6 +2019,8 @@ export default function Home() {
                             }`}>
                               {memberCategory === 'joined'
                                 ? <UserCheck className="w-3.5 h-3.5" />
+                                : memberCategory === 'resigned'
+                                ? <UserMinus className="w-3.5 h-3.5" />
                                 : memberCategory === 'noShow'
                                 ? <AlertTriangle className="w-3.5 h-3.5" />
                                 : memberCategory === 'withdrawn'
@@ -1987,6 +2028,8 @@ export default function Home() {
                                 : <Users className="w-3.5 h-3.5" />}
                               {memberCategory === 'joined'
                                 ? '입사 완료 인원'
+                                : memberCategory === 'resigned'
+                                ? '퇴사 인원'
                                 : memberCategory === 'noShow'
                                 ? '노쇼 인원'
                                 : memberCategory === 'withdrawn'
@@ -1996,6 +2039,8 @@ export default function Home() {
                             <span className={`text-[10px] font-bold ${
                               memberCategory === 'joined'
                                 ? 'text-emerald-700'
+                                : memberCategory === 'resigned'
+                                ? 'text-orange-700'
                                 : memberCategory === 'noShow'
                                 ? 'text-rose-700'
                                 : memberCategory === 'withdrawn'
@@ -2004,6 +2049,8 @@ export default function Home() {
                             }`}>
                               {memberCategory === 'joined'
                                 ? joinedMemberCount
+                                : memberCategory === 'resigned'
+                                ? resignedMemberCount
                                 : memberCategory === 'noShow'
                                 ? noShowMemberCount
                                 : memberCategory === 'withdrawn'
@@ -2021,6 +2068,8 @@ export default function Home() {
                                 className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg transition ${
                                   memberCategory === 'joined'
                                     ? 'text-emerald-800 hover:bg-emerald-100'
+                                    : memberCategory === 'resigned'
+                                    ? 'text-orange-800 hover:bg-orange-100'
                                     : memberCategory === 'noShow'
                                     ? 'text-rose-800 hover:bg-rose-100'
                                     : memberCategory === 'withdrawn'
@@ -2040,6 +2089,8 @@ export default function Home() {
                       <div className={`py-2.5 flex justify-between items-center text-xs ${
                         memberCategory === 'joined'
                           ? 'bg-emerald-50/30'
+                          : memberCategory === 'resigned'
+                          ? 'bg-orange-50/30'
                           : memberCategory === 'noShow'
                           ? 'bg-rose-50/30'
                           : memberCategory === 'withdrawn'
@@ -2093,6 +2144,11 @@ export default function Home() {
                                   <UserCheck className="w-3 h-3" /> 입사완료
                                 </span>
                               )}
+                              {member.resignedAt && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-600 text-white shadow-sm flex items-center gap-0.5">
+                                  <UserMinus className="w-3 h-3" /> 퇴사
+                                </span>
+                              )}
                               {member.isNoShow && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-600 text-white shadow-sm flex items-center gap-0.5">
                                   <AlertTriangle className="w-3 h-3" /> 노쇼
@@ -2133,6 +2189,19 @@ export default function Home() {
                                 탈퇴 해제
                               </button>
                             </div>
+                          ) : member.resignedAt ? (
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="text-[9px] text-orange-700">
+                                {new Date(member.resignedAt).toLocaleDateString('ko-KR')} 퇴사
+                              </span>
+                              <button
+                                onClick={() => toggleResignedStatus(idKey)}
+                                className="font-bold px-1.5 py-1.5 rounded-xl text-[10px] transition bg-orange-50 text-orange-700 border border-orange-200"
+                                title="퇴사 상태 취소"
+                              >
+                                퇴사 취소
+                              </button>
+                            </div>
                           ) : (
                             <>
                               <button
@@ -2146,6 +2215,16 @@ export default function Home() {
                               >
                                 {member.isJoined ? '입사완료' : '입사'}
                               </button>
+
+                              {member.isJoined && (
+                                <button
+                                  onClick={() => toggleResignedStatus(idKey)}
+                                  className="font-bold px-1.5 py-1.5 rounded-xl text-[10px] transition bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100"
+                                  title="퇴사 처리"
+                                >
+                                  퇴사
+                                </button>
+                              )}
 
                               <button
                                 onClick={() => toggleNoShowStatus(idKey)}

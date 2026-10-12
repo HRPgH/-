@@ -26,6 +26,10 @@ GitHub에 코드를 공개하거나 웹앱을 배포하기 전에 Supabase SQL E
 
 탈퇴한 지원자를 보관하려면 Supabase SQL Editor에서 [`supabase/migrations/20261012_member_withdrawn.sql`](./supabase/migrations/20261012_member_withdrawn.sql)을 실행하세요. 이후 앱의 회원 탈퇴는 지원자 행을 삭제하지 않고 비활성화해, 관리자 화면의 `탈퇴` 탭에 탈퇴 날짜와 함께 보관합니다. 이전에 실제 삭제된 계정은 삭제 전 백업이 없는 한 복구할 수 없습니다.
 
+## 퇴사 명단 사용 설정
+
+입사 완료 인원의 퇴사를 별도로 기록하려면 Supabase SQL Editor에서 [`supabase/migrations/20261012_member_resigned.sql`](./supabase/migrations/20261012_member_resigned.sql)을 실행하세요. 관리자 명단에서 입사 완료 인원의 `퇴사` 버튼을 누르면 퇴사 탭에 기록되고, `퇴사 취소`로 입사 상태로 되돌릴 수 있습니다. 앱 계정 탈퇴 명단과는 별도로 관리됩니다.
+
 ## Android 테스트 앱
 
 Android 앱은 웹 화면을 APK에 포함합니다. 로그인, 명단, 대화 등 Supabase 기능을 사용하려면 휴대폰이 인터넷에 연결되어 있어야 합니다.
