@@ -22,6 +22,10 @@ GitHub에 코드를 공개하거나 웹앱을 배포하기 전에 Supabase SQL E
 
 관리자 화면에서 노쇼 상태를 저장하려면 Supabase SQL Editor에서 [`supabase/migrations/20261012_member_no_show.sql`](./supabase/migrations/20261012_member_no_show.sql)을 실행하세요. 실행 후 관리자 명단의 `노쇼` 탭에서 노쇼 인원을 확인할 수 있습니다. 노쇼로 표시하면 지원자 명단에서 분리되고, 노쇼 상태 변경을 취소하거나 입사 완료로 표시하면 다른 해당 명단으로 이동합니다.
 
+## 탈퇴 명단 사용 설정
+
+탈퇴한 지원자를 보관하려면 Supabase SQL Editor에서 [`supabase/migrations/20261012_member_withdrawn.sql`](./supabase/migrations/20261012_member_withdrawn.sql)을 실행하세요. 이후 앱의 회원 탈퇴는 지원자 행을 삭제하지 않고 비활성화해, 관리자 화면의 `탈퇴` 탭에 탈퇴 날짜와 함께 보관합니다. 이전에 실제 삭제된 계정은 삭제 전 백업이 없는 한 복구할 수 없습니다.
+
 ## Android 테스트 앱
 
 Android 앱은 웹 화면을 APK에 포함합니다. 로그인, 명단, 대화 등 Supabase 기능을 사용하려면 휴대폰이 인터넷에 연결되어 있어야 합니다.

@@ -79,7 +79,7 @@ function getBotResponse(userMsg: string): string {
   return '🤖 말씀해 주신 내용은 챗봇으로 답변하기 어렵습니다.\n\n상세한 문의 사항은 담당 관리자 번호(☎️ 054-450-8618)로 연락 주시면 친절히 안내해 드리겠습니다!';
 }
 
-interface MemberItem { idKey: string; name: string; code: string; part: string; isJoined?: boolean; isNoShow?: boolean; isOnline?: boolean; lastLoginAt?: string | null; }
+interface MemberItem { idKey: string; name: string; code: string; part: string; isJoined?: boolean; isNoShow?: boolean; withdrawnAt?: string | null; isOnline?: boolean; lastLoginAt?: string | null; }
 interface MessageItem { id?: number; sender_name: string; sender_role: 'worker' | 'admin'; receiver_name: string; message: string; is_read?: boolean; created_at?: string; }
 interface AnnouncementItem { id: number; title: string; content: string; created_at: string; }
 interface AvailabilityItem { worker_name: string; status: 'possible' | 'impossible'; created_at: string; }
@@ -98,7 +98,7 @@ export default function Home() {
   const [adminDb, setAdminDb] = useState<{ [key: string]: true }>({});
 
   const [memberSearchTerm, setMemberSearchTerm] = useState<string>('');
-  const [adminMemberTab, setAdminMemberTab] = useState<'applicants' | 'joined' | 'noShow'>('applicants');
+  const [adminMemberTab, setAdminMemberTab] = useState<'applicants' | 'joined' | 'noShow' | 'withdrawn'>('applicants');
   const [memberConnectionFilter, setMemberConnectionFilter] = useState<'all' | 'recorded' | 'online' | 'offline'>('all');
   const [showAdminManageModal, setShowAdminManageModal] = useState<boolean>(false);
   const [newAdminName, setNewAdminName] = useState<string>('');
@@ -263,6 +263,7 @@ export default function Home() {
           dbMap[idKey] = {
             idKey, name: item.name, code: item.code, part: item.part,
             isJoined: item.is_joined === true, isNoShow: item.is_no_show === true,
+            withdrawnAt: item.withdrawn_at || null,
             isOnline: item.is_online === true, lastLoginAt: item.last_login_at
           };
         });
@@ -536,6 +537,11 @@ export default function Home() {
       if (nextFailed >= 5) setIsLockedOut(true); return;
     }
 
+    if (memberData.withdrawn_at) {
+      alert('탈퇴 처리된 계정입니다. 다시 이용하려면 관리자에게 문의해 주세요.');
+      return;
+    }
+
     const nowIso = new Date().toISOString();
     const { error: statusError } = await supabase
       .from('members')
@@ -577,11 +583,40 @@ export default function Home() {
   };
 
   const handleWorkerSelfDelete = async () => {
-    if (confirm(`⚠️ 정말로 탈퇴하시겠습니까?\n\n탈퇴 시 명단 및 개인 전용 코드가 삭제되며, 추후 재가입 및 생성이 어려울 수 있습니다.`)) {
-      if (supabase) { await supabase.from('members').delete().match({ name: userName, code: userCode }); }
+    if (confirm(`⚠️ 정말로 탈퇴하시겠습니까?\n\n탈퇴하면 계정은 비활성화되고 관리자의 탈퇴 명단에 기록됩니다.`)) {
+      if (!supabase) {
+        alert('DB 연결에 실패하여 탈퇴 처리할 수 없습니다.');
+        return;
+      }
+      const { error } = await supabase.from('members')
+        .update({ withdrawn_at: new Date().toISOString(), is_online: false })
+        .match({ name: userName, code: userCode });
+      if (error) {
+        alert(`탈퇴 처리에 실패했습니다: ${error.message}`);
+        return;
+      }
       alert('탈퇴가 완료되었습니다.');
-      handleLogout();
+      setActiveModal(null);
+      setIsLoggedIn(false);
+      setLoginName('');
+      setLoginCode('');
+      setUserName('');
+      setUserCode('');
+      await fetchMembers();
     }
+  };
+
+  const restoreWithdrawnMember = async (idKey: string) => {
+    const target = memberDb[idKey];
+    if (!target || !supabase) return;
+    const { error } = await supabase.from('members')
+      .update({ withdrawn_at: null, is_joined: false, is_no_show: false })
+      .match({ name: target.name, code: target.code });
+    if (error) {
+      alert(`탈퇴 상태 해제에 실패했습니다: ${error.message}`);
+      return;
+    }
+    await fetchMembers();
   };
 
   const toggleJoinStatus = async (idKey: string) => {
@@ -885,7 +920,7 @@ export default function Home() {
         성명: member.name,
         코드: member.code,
         근무파트: member.part,
-        입사상태: member.isJoined ? '입사완료' : '지원자',
+        입사상태: member.withdrawnAt ? '탈퇴' : member.isJoined ? '입사완료' : member.isNoShow ? '노쇼' : '지원자',
         접속상태: member.isOnline ? '접속중' : member.lastLoginAt ? '기록' : '미접속',
         최근접속: member.lastLoginAt || '',
       };
@@ -1106,12 +1141,13 @@ export default function Home() {
     return (itemA?.name || '').localeCompare(itemB?.name || '');
   });
   const activeMemberCount = allKeys.filter(
-    (idKey) => !memberDb[idKey]?.isJoined && !memberDb[idKey]?.isNoShow
+    (idKey) => !memberDb[idKey]?.withdrawnAt && !memberDb[idKey]?.isJoined && !memberDb[idKey]?.isNoShow
   ).length;
-  const joinedMemberCount = allKeys.filter((idKey) => memberDb[idKey]?.isJoined).length;
-  const noShowMemberCount = allKeys.filter((idKey) => memberDb[idKey]?.isNoShow).length;
+  const joinedMemberCount = allKeys.filter((idKey) => !memberDb[idKey]?.withdrawnAt && memberDb[idKey]?.isJoined).length;
+  const noShowMemberCount = allKeys.filter((idKey) => !memberDb[idKey]?.withdrawnAt && memberDb[idKey]?.isNoShow).length;
+  const withdrawnMemberCount = allKeys.filter((idKey) => !!memberDb[idKey]?.withdrawnAt).length;
   const getMemberCategory = (member?: MemberItem) =>
-    member?.isJoined ? 'joined' : member?.isNoShow ? 'noShow' : 'applicants';
+    member?.withdrawnAt ? 'withdrawn' : member?.isJoined ? 'joined' : member?.isNoShow ? 'noShow' : 'applicants';
   const currentTabMemberKeys = allKeys.filter((idKey) => getMemberCategory(memberDb[idKey]) === adminMemberTab);
   const memberConnectionCounts = {
     all: currentTabMemberKeys.length,
@@ -1747,7 +1783,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100 rounded-xl">
+              <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl">
                 <button
                   onClick={() => setAdminMemberTab('applicants')}
                   className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition ${
@@ -1780,6 +1816,17 @@ export default function Home() {
                 >
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                   <span>노쇼 ({noShowMemberCount})</span>
+                </button>
+                <button
+                  onClick={() => setAdminMemberTab('withdrawn')}
+                  className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition ${
+                    adminMemberTab === 'withdrawn'
+                      ? 'bg-white text-slate-700 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  <UserMinus className="w-3.5 h-3.5 shrink-0" />
+                  <span>탈퇴 ({withdrawnMemberCount})</span>
                 </button>
               </div>
 
@@ -1836,7 +1883,13 @@ export default function Home() {
                     <Square className="w-4 h-4 text-slate-400" />
                   )}
                   <span>
-                    {adminMemberTab === 'joined' ? '입사 완료' : adminMemberTab === 'noShow' ? '노쇼' : '지원자'}
+                    {adminMemberTab === 'joined'
+                      ? '입사 완료'
+                      : adminMemberTab === 'noShow'
+                      ? '노쇼'
+                      : adminMemberTab === 'withdrawn'
+                      ? '탈퇴'
+                      : '지원자'}
                     {' '}전체 선택 ({currentTabSelectedCount}/{currentTabMemberKeys.length})
                   </span>
                 </button>
@@ -1886,6 +1939,8 @@ export default function Home() {
                       ? '입사 완료 인원이 없습니다.'
                       : adminMemberTab === 'noShow'
                       ? '노쇼로 표시된 인원이 없습니다.'
+                      : adminMemberTab === 'withdrawn'
+                      ? '탈퇴한 인원이 없습니다.'
                       : '등록된 지원자가 없습니다.'}
                   </div>
                 ) : (
@@ -1909,6 +1964,8 @@ export default function Home() {
                             ? 'bg-emerald-50/70'
                             : memberCategory === 'noShow'
                             ? 'bg-rose-50/70'
+                            : memberCategory === 'withdrawn'
+                            ? 'bg-slate-200/70'
                             : 'bg-slate-50/80'
                         }`}>
                           <div>
@@ -1917,23 +1974,41 @@ export default function Home() {
                                 ? 'text-emerald-800'
                                 : memberCategory === 'noShow'
                                 ? 'text-rose-800'
+                                : memberCategory === 'withdrawn'
+                                ? 'text-slate-700'
                                 : 'text-slate-600'
                             }`}>
                               {memberCategory === 'joined'
                                 ? <UserCheck className="w-3.5 h-3.5" />
                                 : memberCategory === 'noShow'
                                 ? <AlertTriangle className="w-3.5 h-3.5" />
+                                : memberCategory === 'withdrawn'
+                                ? <UserMinus className="w-3.5 h-3.5" />
                                 : <Users className="w-3.5 h-3.5" />}
-                              {memberCategory === 'joined' ? '입사 완료 인원' : memberCategory === 'noShow' ? '노쇼 인원' : '지원자'}
+                              {memberCategory === 'joined'
+                                ? '입사 완료 인원'
+                                : memberCategory === 'noShow'
+                                ? '노쇼 인원'
+                                : memberCategory === 'withdrawn'
+                                ? '탈퇴 인원'
+                                : '지원자'}
                             </div>
                             <span className={`text-[10px] font-bold ${
                               memberCategory === 'joined'
                                 ? 'text-emerald-700'
                                 : memberCategory === 'noShow'
                                 ? 'text-rose-700'
+                                : memberCategory === 'withdrawn'
+                                ? 'text-slate-600'
                                 : 'text-slate-500'
                             }`}>
-                              {memberCategory === 'joined' ? joinedMemberCount : memberCategory === 'noShow' ? noShowMemberCount : activeMemberCount}명
+                              {memberCategory === 'joined'
+                                ? joinedMemberCount
+                                : memberCategory === 'noShow'
+                                ? noShowMemberCount
+                                : memberCategory === 'withdrawn'
+                                ? withdrawnMemberCount
+                                : activeMemberCount}명
                             </span>
                           </div>
                           {(() => {
@@ -1948,6 +2023,8 @@ export default function Home() {
                                     ? 'text-emerald-800 hover:bg-emerald-100'
                                     : memberCategory === 'noShow'
                                     ? 'text-rose-800 hover:bg-rose-100'
+                                    : memberCategory === 'withdrawn'
+                                    ? 'text-slate-700 hover:bg-slate-300'
                                     : 'text-slate-600 hover:bg-slate-200'
                                 }`}
                               >
@@ -1961,7 +2038,13 @@ export default function Home() {
                         </div>
                       )}
                       <div className={`py-2.5 flex justify-between items-center text-xs ${
-                        memberCategory === 'joined' ? 'bg-emerald-50/30' : memberCategory === 'noShow' ? 'bg-rose-50/30' : ''
+                        memberCategory === 'joined'
+                          ? 'bg-emerald-50/30'
+                          : memberCategory === 'noShow'
+                          ? 'bg-rose-50/30'
+                          : memberCategory === 'withdrawn'
+                          ? 'bg-slate-100/70'
+                          : ''
                       }`}>
                         <div className="flex items-center gap-2">
                           <button onClick={() => toggleSelectMember(idKey)} className="text-slate-400">
@@ -2015,6 +2098,11 @@ export default function Home() {
                                   <AlertTriangle className="w-3 h-3" /> 노쇼
                                 </span>
                               )}
+                              {member.withdrawnAt && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-600 text-white shadow-sm flex items-center gap-0.5">
+                                  <UserMinus className="w-3 h-3" /> 탈퇴
+                                </span>
+                              )}
                               
                               {workerStatus === 'impossible' && (
                                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200/60">
@@ -2032,29 +2120,46 @@ export default function Home() {
                         </div>
 
                         <div className="flex flex-wrap items-center justify-end gap-1">
-                          <button
-                            onClick={() => toggleJoinStatus(idKey)}
-                            className={`font-bold px-1.5 py-1.5 rounded-xl text-[10px] transition ${
-                              member.isJoined
-                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600'
-                            }`}
-                            title="입사 상태 변경"
-                          >
-                            {member.isJoined ? '입사완료' : '입사'}
-                          </button>
+                          {member.withdrawnAt ? (
+                            <div className="flex flex-col items-end gap-1">
+                              <span className="text-[9px] text-slate-500">
+                                {new Date(member.withdrawnAt).toLocaleDateString('ko-KR')} 탈퇴
+                              </span>
+                              <button
+                                onClick={() => restoreWithdrawnMember(idKey)}
+                                className="font-bold px-1.5 py-1.5 rounded-xl text-[10px] transition bg-blue-50 text-blue-700 border border-blue-200"
+                                title="탈퇴 상태 해제"
+                              >
+                                탈퇴 해제
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => toggleJoinStatus(idKey)}
+                                className={`font-bold px-1.5 py-1.5 rounded-xl text-[10px] transition ${
+                                  member.isJoined
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600'
+                                }`}
+                                title="입사 상태 변경"
+                              >
+                                {member.isJoined ? '입사완료' : '입사'}
+                              </button>
 
-                          <button
-                            onClick={() => toggleNoShowStatus(idKey)}
-                            className={`font-bold px-1.5 py-1.5 rounded-xl text-[10px] transition ${
-                              member.isNoShow
-                                ? 'bg-rose-100 text-rose-800 border border-rose-300'
-                                : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600'
-                            }`}
-                            title="노쇼 상태 변경"
-                          >
-                            {member.isNoShow ? '노쇼 해제' : '노쇼'}
-                          </button>
+                              <button
+                                onClick={() => toggleNoShowStatus(idKey)}
+                                className={`font-bold px-1.5 py-1.5 rounded-xl text-[10px] transition ${
+                                  member.isNoShow
+                                    ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600'
+                                }`}
+                                title="노쇼 상태 변경"
+                              >
+                                {member.isNoShow ? '노쇼 해제' : '노쇼'}
+                              </button>
+                            </>
+                          )}
 
                           <button
                             onClick={() => openChatWithWorker(idKey)}
