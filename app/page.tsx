@@ -150,7 +150,7 @@ export default function Home() {
   const [workerIncomingNotification, setWorkerIncomingNotification] = useState<WorkerIncomingNotification | null>(null);
   const [showAdminNotificationMenu, setShowAdminNotificationMenu] = useState<boolean>(false);
 
-  const [activeModal, setActiveModal] = useState<'shuttle' | 'guide' | null>(null);
+  const [activeModal, setActiveModal] = useState<'shuttle' | 'guide' | 'resignation' | null>(null);
   const [isFirstLoginGuide, setIsFirstLoginGuide] = useState(false);
   const welcomeMessageRequests = useRef(new Set<string>());
   const seenWorkerMessageIds = useRef(new Set<number>());
@@ -1436,7 +1436,7 @@ export default function Home() {
 
             <div>
               <h3 className="text-xs font-bold text-slate-500 mb-2">빠른 메뉴</h3>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-5 gap-2">
                 <button 
                   onClick={() => setActiveModal('shuttle')}
                   className="bg-white p-2.5 rounded-2xl border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 shadow-sm hover:border-blue-300 transition text-center"
@@ -1467,6 +1467,13 @@ export default function Home() {
                 >
                   <UserMinus className="w-5 h-5 text-red-500 shrink-0" />
                   <span className="text-[10px] font-bold text-red-500">회원 탈퇴</span>
+                </button>
+                <button
+                  onClick={() => setActiveModal('resignation')}
+                  className="bg-white p-2.5 rounded-2xl border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 shadow-sm hover:border-amber-300 transition text-center"
+                >
+                  <FileText className="w-5 h-5 text-amber-500 shrink-0" />
+                  <span className="text-[10px] font-bold text-slate-700">퇴직 절차</span>
                 </button>
               </div>
             </div>
@@ -2615,6 +2622,62 @@ export default function Home() {
               </div>
               <button
                 onClick={closeGuideModal}
+                className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-xs"
+              >
+                확인 완료
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeModal === 'resignation' && (
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white w-full rounded-3xl p-5 shadow-2xl space-y-4 max-h-[560px] flex flex-col border border-slate-200">
+              <div className="flex justify-between items-center border-b pb-3">
+                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                  <FileText className="w-4 h-4 text-amber-600" /> 퇴직 절차 안내
+                </h3>
+                <button onClick={() => setActiveModal(null)} className="text-slate-400 text-sm font-bold" aria-label="퇴직 절차 안내 닫기">
+                  ✕
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3 text-xs text-slate-700 leading-relaxed pr-1">
+                <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                  마지막 근무일과 필요한 절차는 근무 상황에 따라 다를 수 있으니 담당 관리자와 먼저 확인해 주세요.
+                </p>
+                <div className="bg-blue-50 p-3.5 rounded-2xl border border-blue-100">
+                  <p className="font-bold text-blue-900 mb-1">1. 퇴직 의사와 마지막 근무일 알리기</p>
+                  <p className="text-slate-600">
+                    담당 관리자에게 퇴직 의사와 희망하는 마지막 근무일을 미리 전달하고, 남은 근무 일정과 퇴직일을 확인해 주세요.
+                  </p>
+                </div>
+                <div className="bg-emerald-50 p-3.5 rounded-2xl border border-emerald-100">
+                  <p className="font-bold text-emerald-900 mb-1">2. 반납할 물품 확인하기</p>
+                  <p className="text-slate-600">
+                    지급받은 작업복, 출입증 또는 기타 회사 물품이 있다면 반납 방법과 기한을 관리자에게 확인해 주세요.
+                  </p>
+                </div>
+                <div className="bg-purple-50 p-3.5 rounded-2xl border border-purple-100">
+                  <p className="font-bold text-purple-900 mb-1">3. 근무·급여 정산 확인하기</p>
+                  <p className="text-slate-600">
+                    실제 마지막 근무일과 근무 내역을 확인하고, 급여 정산 및 필요한 서류가 있는지 담당 관리자에게 문의해 주세요.
+                  </p>
+                </div>
+                <div className="bg-red-50 p-3.5 rounded-2xl border border-red-100">
+                  <p className="font-bold text-red-900 mb-1">회원 탈퇴와 퇴직은 별도입니다</p>
+                  <p className="text-slate-600">
+                    빠른 메뉴의 [회원 탈퇴]는 앱 계정을 삭제하는 기능이며 퇴직 신청이나 근무 일정 취소를 대신하지 않습니다. 퇴직 관련 확인을 마친 뒤 이용해 주세요.
+                  </p>
+                </div>
+                <div className="bg-slate-100 p-3.5 rounded-2xl border border-slate-200">
+                  <p className="font-bold text-slate-800">담당 관리자 문의</p>
+                  <p className="text-slate-600">☎️ 054-450-8618</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setActiveModal(null)}
                 className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-xs"
               >
                 확인 완료
