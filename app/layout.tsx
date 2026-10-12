@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Shiftmate",
-  description: "출근 안내 및 근무자 관리",
+  title: "올품(아르바이트) 채용 도우미",
+  description: "아르바이트 채용 지원, 출근 안내 및 근무 관리",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: "/shiftmate-icon.svg",
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "Shiftmate",
+    title: "올품(아르바이트) 채용 도우미",
     statusBarStyle: "default",
   },
 };

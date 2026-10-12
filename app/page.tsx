@@ -1207,10 +1207,11 @@ export default function Home() {
           <div className="py-4 flex flex-col justify-between min-h-[680px]">
             <div>
               <div className="text-center mt-4 mb-6">
-                <span className="text-xs font-black tracking-widest text-blue-600 uppercase flex items-center justify-center gap-1">
-                  <ShieldCheck className="w-4 h-4 text-emerald-500" /> SHIFTMATE
-                </span>
-                <h1 className="text-2xl font-black text-slate-900 mt-1">(주)올품 출근 안내</h1>
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <img src="/shiftmate-icon.svg" alt="올품 로고" className="h-8 w-8 rounded-full object-cover shadow-sm" />
+                  <span className="text-xs font-black tracking-widest text-blue-600 uppercase">올품 채용 도우미</span>
+                </div>
+                <h1 className="text-2xl font-black text-slate-900 mt-1">올품(아르바이트) 채용 도우미</h1>
                 <p className="text-xs text-slate-400 mt-1.5">성명과 전용 코드/비밀번호를 입력하세요</p>
               </div>
 
@@ -1294,7 +1295,7 @@ export default function Home() {
           <div className="space-y-5">
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-xs font-black tracking-wider text-blue-600">(주)올품 SHIFTMATE</span>
+                <span className="text-xs font-black tracking-wider text-blue-600">올품(아르바이트) 채용 도우미</span>
                 <h1 className="text-lg font-bold">{userName}님, 안녕하세요</h1>
               </div>
 
@@ -1476,7 +1477,7 @@ export default function Home() {
           <div className="space-y-5">
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-xs font-black tracking-wider text-blue-600">(주)올품 ADMIN</span>
+                <span className="text-xs font-black tracking-wider text-blue-600">올품(아르바이트) 채용 도우미 관리자</span>
                 <h1 className="text-lg font-bold">{userName}님, 안녕하세요</h1>
               </div>
               <div className="flex items-center gap-2">
