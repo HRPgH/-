@@ -144,6 +144,8 @@ export default function Home() {
   const [chatTargetWorkerKey, setChatTargetWorkerKey] = useState<string>('');
   const [chatMessages, setChatMessages] = useState<MessageItem[]>([]);
   const [inputMessage, setInputMessage] = useState<string>('');
+  const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
+  const chatScrollStateRef = useRef({ isOpen: false, target: '', messageCount: 0 });
   const [unreadCounts, setUnreadCounts] = useState<{ [idKey: string]: number }>({});
   const [latestWorkerMessageAt, setLatestWorkerMessageAt] = useState<{ [idKey: string]: string }>({});
   const [unreadWorkerMessages, setUnreadWorkerMessages] = useState<{ [idKey: string]: MessageItem }>({});
@@ -162,6 +164,25 @@ export default function Home() {
   const hasInitializedWorkerAnnouncements = useRef(false);
 
   const userUniqueKey = `${userName}_${userCode}`;
+  useEffect(() => {
+    const target = role === 'admin' ? chatTargetWorkerKey : userUniqueKey;
+    const previous = chatScrollStateRef.current;
+    const shouldScroll = showChatModal && (
+      !previous.isOpen ||
+      previous.target !== target ||
+      chatMessages.length > previous.messageCount
+    );
+    const behavior: ScrollBehavior = previous.isOpen && previous.target === target ? 'smooth' : 'auto';
+    chatScrollStateRef.current = { isOpen: showChatModal, target, messageCount: chatMessages.length };
+
+    if (shouldScroll) {
+      requestAnimationFrame(() => {
+        const container = chatMessagesContainerRef.current;
+        if (container) container.scrollTo({ top: container.scrollHeight, behavior });
+      });
+    }
+  }, [showChatModal, role, chatTargetWorkerKey, userUniqueKey, chatMessages.length]);
+
   const latestAvailabilityDate = useMemo(() => {
     return availabilityRecords.reduce((latestDate, record) => {
       const recordDate = getAvailabilityDateKey(new Date(record.created_at));
@@ -2483,7 +2504,7 @@ export default function Home() {
                 </button>
               </div>
 
-              <div className="flex-1 p-3.5 bg-slate-50 overflow-y-auto space-y-2.5 font-sans text-xs">
+              <div ref={chatMessagesContainerRef} className="flex-1 min-h-0 p-3.5 bg-slate-50 overflow-y-auto overscroll-contain space-y-2.5 font-sans text-xs">
                 {chatMessages.length === 0 ? (
                   <div className="text-center py-20 text-[11px] text-slate-400 font-medium leading-relaxed">
                     🤖 (주)올품 챗봇에게 셔틀버스, 근무시간, 주소, 급여일 등을 물어보세요!<br />
