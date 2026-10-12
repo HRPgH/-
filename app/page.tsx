@@ -1436,7 +1436,7 @@ export default function Home() {
 
             <div>
               <h3 className="text-xs font-bold text-slate-500 mb-2">빠른 메뉴</h3>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <button 
                   onClick={() => setActiveModal('shuttle')}
                   className="bg-white p-2.5 rounded-2xl border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 shadow-sm hover:border-blue-300 transition text-center"
