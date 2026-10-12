@@ -99,6 +99,7 @@ export default function Home() {
 
   const [memberSearchTerm, setMemberSearchTerm] = useState<string>('');
   const [adminMemberTab, setAdminMemberTab] = useState<'applicants' | 'joined'>('applicants');
+  const [memberConnectionFilter, setMemberConnectionFilter] = useState<'all' | 'recorded' | 'online' | 'offline'>('all');
   const [showAdminManageModal, setShowAdminManageModal] = useState<boolean>(false);
   const [newAdminName, setNewAdminName] = useState<string>('');
   const [newAdminPassword, setNewAdminPassword] = useState<string>('');
@@ -1064,10 +1065,23 @@ export default function Home() {
   const currentTabMemberKeys = allKeys.filter(
     (idKey) => !!memberDb[idKey]?.isJoined === (adminMemberTab === 'joined')
   );
+  const memberConnectionCounts = {
+    all: currentTabMemberKeys.length,
+    recorded: currentTabMemberKeys.filter((idKey) => !memberDb[idKey]?.isOnline && !!memberDb[idKey]?.lastLoginAt).length,
+    online: currentTabMemberKeys.filter((idKey) => memberDb[idKey]?.isOnline === true).length,
+    offline: currentTabMemberKeys.filter((idKey) => !memberDb[idKey]?.isOnline && !memberDb[idKey]?.lastLoginAt).length,
+  };
   const currentTabSelectedCount = currentTabMemberKeys.filter((idKey) => selectedMembers[idKey]).length;
   const visibleMemberKeys = sortedKeys.filter((idKey) =>
     adminMemberTab === 'joined' ? !!memberDb[idKey]?.isJoined : !memberDb[idKey]?.isJoined
-  );
+  ).filter((idKey) => {
+    const member = memberDb[idKey];
+    if (!member) return false;
+    if (memberConnectionFilter === 'online') return member.isOnline === true;
+    if (memberConnectionFilter === 'recorded') return member.isOnline !== true && !!member.lastLoginAt;
+    if (memberConnectionFilter === 'offline') return member.isOnline !== true && !member.lastLoginAt;
+    return true;
+  });
 
   const isAllChecked = currentTabMemberKeys.length > 0 && currentTabSelectedCount === currentTabMemberKeys.length;
   const selectedCount = Object.values(selectedMembers).filter(Boolean).length;
@@ -1729,6 +1743,29 @@ export default function Home() {
                 )}
               </div>
 
+              <div className="grid grid-cols-4 gap-1.5" aria-label="접속 상태별 명단 필터">
+                {([
+                  ['all', '전체', memberConnectionCounts.all],
+                  ['recorded', '기록', memberConnectionCounts.recorded],
+                  ['online', '접속중', memberConnectionCounts.online],
+                  ['offline', '미접속', memberConnectionCounts.offline],
+                ] as const).map(([filter, label, count]) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => setMemberConnectionFilter(filter)}
+                    aria-pressed={memberConnectionFilter === filter}
+                    className={`rounded-lg border px-1 py-2 text-[10px] font-bold transition ${
+                      memberConnectionFilter === filter
+                        ? 'border-blue-300 bg-blue-50 text-blue-700'
+                        : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    {label} {count}
+                  </button>
+                ))}
+              </div>
+
               <div className="flex justify-between items-center text-xs bg-slate-50 p-2 rounded-xl border border-slate-200/60">
                 <button
                   onClick={toggleSelectAll}
@@ -1776,6 +1813,8 @@ export default function Home() {
                   <div className="text-center py-8 text-slate-400 text-xs font-medium">
                     {memberSearchTerm
                       ? `'${memberSearchTerm}' 검색 결과가 없습니다.`
+                      : memberConnectionFilter !== 'all'
+                      ? '선택한 접속 상태의 인원이 없습니다.'
                       : adminMemberTab === 'joined'
                       ? '입사 완료 인원이 없습니다.'
                       : '등록된 지원자가 없습니다.'}
