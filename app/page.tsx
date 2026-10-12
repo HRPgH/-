@@ -1461,19 +1461,19 @@ export default function Home() {
                   <Download className="w-5 h-5 text-emerald-500 shrink-0" />
                   <span className="text-[10px] font-bold text-slate-700">ONE-HR</span>
                 </button>
-                <button 
-                  onClick={handleWorkerSelfDelete}
-                  className="bg-white p-2.5 rounded-2xl border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 shadow-sm hover:border-red-300 transition text-center"
-                >
-                  <UserMinus className="w-5 h-5 text-red-500 shrink-0" />
-                  <span className="text-[10px] font-bold text-red-500">회원 탈퇴</span>
-                </button>
                 <button
                   onClick={() => setActiveModal('resignation')}
                   className="bg-white p-2.5 rounded-2xl border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 shadow-sm hover:border-amber-300 transition text-center"
                 >
                   <FileText className="w-5 h-5 text-amber-500 shrink-0" />
                   <span className="text-[10px] font-bold text-slate-700">퇴직 절차</span>
+                </button>
+                <button
+                  onClick={handleWorkerSelfDelete}
+                  className="bg-white p-2.5 rounded-2xl border border-slate-200/80 flex flex-col items-center justify-center gap-1.5 shadow-sm hover:border-red-300 transition text-center"
+                >
+                  <UserMinus className="w-5 h-5 text-red-500 shrink-0" />
+                  <span className="text-[10px] font-bold text-red-500">회원 탈퇴</span>
                 </button>
               </div>
             </div>
