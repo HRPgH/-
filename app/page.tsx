@@ -123,6 +123,7 @@ export default function Home() {
   const [selectedConfirmedMembers, setSelectedConfirmedMembers] = useState<{ [idKey: string]: boolean }>({});
   const [showGroupMsgModal, setShowGroupMsgModal] = useState<boolean>(false);
   const [groupMsgText, setGroupMsgText] = useState<string>('');
+  const [groupMessageRecipientKeys, setGroupMessageRecipientKeys] = useState<string[]>([]);
 
   const [showLoginHistoryModal, setShowLoginHistoryModal] = useState<boolean>(false);
   const [historyTargetKey, setHistoryTargetKey] = useState<string>('');
@@ -614,7 +615,7 @@ export default function Home() {
   const handleSendGroupMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = groupMsgText.trim();
-    const selectedKeys = Object.keys(selectedMembers).filter(k => selectedMembers[k]);
+    const selectedKeys = groupMessageRecipientKeys;
 
     if (!text || selectedKeys.length === 0 || !supabase) return;
 
@@ -624,8 +625,12 @@ export default function Home() {
       alert(`메시지 전송에 실패했습니다: ${error.message}`);
       return;
     }
-    alert(`📩 선택한 ${selectedKeys.length}명 지원자에게 메시지가 동시 전송되었습니다.`);
-    setGroupMsgText(''); setShowGroupMsgModal(false); setSelectedMembers({}); fetchMessages();
+    alert(`📩 선택한 ${selectedKeys.length}명에게 메시지가 동시 전송되었습니다.`);
+    setGroupMsgText('');
+    setGroupMessageRecipientKeys([]);
+    setShowGroupMsgModal(false);
+    setSelectedMembers({});
+    await fetchMessages();
   };
 
   const handleAddAdmin = async (e: React.FormEvent) => {
@@ -1847,7 +1852,12 @@ export default function Home() {
                   )}
                   {selectedCount > 0 && (
                     <button
-                      onClick={() => setShowGroupMsgModal(true)}
+                      onClick={() => {
+                        setGroupMessageRecipientKeys(
+                          Object.keys(selectedMembers).filter((idKey) => selectedMembers[idKey] && memberDb[idKey])
+                        );
+                        setShowGroupMsgModal(true);
+                      }}
                       className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-2.5 py-1 rounded-lg text-[11px] flex items-center gap-1 transition shadow-sm"
                     >
                       <Send className="w-3 h-3" /> 선택 메시지 ({selectedCount})
@@ -2106,12 +2116,25 @@ export default function Home() {
                       전체 선택 ({selectedConfirmedCount}/{confirmedCount})
                     </button>
                     {selectedConfirmedCount > 0 && (
-                      <button
-                        onClick={handleDownloadSelectedConfirmed}
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2.5 py-1.5 rounded-lg text-[11px] flex items-center gap-1 transition shadow-sm"
-                      >
-                        <Download className="w-3 h-3" /> 엑셀 다운로드 ({selectedConfirmedCount})
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => {
+                            setGroupMessageRecipientKeys(
+                              confirmedList.filter((idKey) => selectedConfirmedMembers[idKey])
+                            );
+                            setShowGroupMsgModal(true);
+                          }}
+                          className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-2.5 py-1.5 rounded-lg text-[11px] flex items-center gap-1 transition shadow-sm"
+                        >
+                          <Send className="w-3 h-3" /> 메시지 ({selectedConfirmedCount})
+                        </button>
+                        <button
+                          onClick={handleDownloadSelectedConfirmed}
+                          className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2.5 py-1.5 rounded-lg text-[11px] flex items-center gap-1 transition shadow-sm"
+                        >
+                          <Download className="w-3 h-3" /> 엑셀 ({selectedConfirmedCount})
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
@@ -2170,7 +2193,7 @@ export default function Home() {
             <div className="bg-white w-full rounded-3xl p-5 shadow-2xl space-y-4 border border-slate-200">
               <div className="flex justify-between items-center border-b pb-3">
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                  <Send className="w-4 h-4 text-blue-600" /> 선택 지원자 메시지 단체 전송
+                  <Send className="w-4 h-4 text-blue-600" /> 선택 인원 메시지 단체 전송
                 </h3>
                 <button onClick={() => setShowGroupMsgModal(false)} className="text-slate-400 text-sm font-bold">
                   ✕
@@ -2180,7 +2203,7 @@ export default function Home() {
               <form onSubmit={handleSendGroupMessage} className="space-y-3 text-xs">
                 <div>
                   <label className="block font-bold text-slate-600 mb-1">
-                    선택한 {selectedCount}명에게 보낼 메시지
+                    선택한 {groupMessageRecipientKeys.length}명에게 보낼 메시지
                   </label>
                   <textarea
                     rows={4}
@@ -2196,7 +2219,7 @@ export default function Home() {
                   type="submit"
                   className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl text-xs transition shadow-md shadow-blue-500/20"
                 >
-                  {selectedCount}명에게 동시에 전송
+                  {groupMessageRecipientKeys.length}명에게 동시에 전송
                 </button>
               </form>
             </div>
