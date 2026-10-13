@@ -30,6 +30,10 @@ GitHub에 코드를 공개하거나 웹앱을 배포하기 전에 Supabase SQL E
 
 입사 완료 인원의 퇴사를 별도로 기록하려면 Supabase SQL Editor에서 [`supabase/migrations/20261012_member_resigned.sql`](./supabase/migrations/20261012_member_resigned.sql)을 실행하세요. 관리자 명단에서 입사 완료 인원의 `퇴사` 버튼을 누르면 퇴사 탭에 기록되고, `퇴사 취소`로 입사 상태로 되돌릴 수 있습니다. 앱 계정 탈퇴 명단과는 별도로 관리됩니다.
 
+## 근무 파트 관리
+
+관리자 인원 명단에서 각 인원의 근무 파트를 선택하면 변경 내용이 바로 저장됩니다. 근무 파트는 `생산 1,2팀`, `생산 1팀`, `생산 2팀`, `물류팀`, `생계물류팀`, `생산지원팀` 중에서 선택할 수 있으며, 신규 인원 등록에도 같은 선택지가 적용됩니다.
+
 ## 출근 예정일 관리 사용 설정
 
 관리자가 지원자 명단에서 인원을 선택해 출근 예정일을 저장하려면 Supabase SQL Editor에서 [`supabase/migrations/20261013_member_scheduled_work_date.sql`](./supabase/migrations/20261013_member_scheduled_work_date.sql)을 실행하세요. 예정일은 지원자마다 한 날짜로 저장되며, 명단과 해당 날짜의 출근 응답 현황에 표시됩니다. 기존 앱 데이터에는 영향을 주지 않습니다.

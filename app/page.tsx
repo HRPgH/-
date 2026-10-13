@@ -5,6 +5,15 @@ import { Bus, Bell, Key, User, ShieldCheck, AlertTriangle, BookOpen, Info, Plus,
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 
+const WORK_PART_OPTIONS = [
+  '생산 1,2팀',
+  '생산 1팀',
+  '생산 2팀',
+  '물류팀',
+  '생계물류팀',
+  '생산지원팀',
+] as const;
+
 const getSupabaseClient = (): SupabaseClient | null => {
   const url = "https://aqcyvftecwqnlpotssdh.supabase.co"; 
   const key = "sb_publishable_Sg4l3u7NxxQBPEw_ROmHgA_Btfbj67f"; 
@@ -99,6 +108,7 @@ export default function Home() {
   const GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfZdBbWY7B26JVyus9qlmglVFNh-oZ791GCFU9MJ0-5wu28tw/viewform?usp=dialog";
 
   const [memberDb, setMemberDb] = useState<{ [idKey: string]: MemberItem }>({});
+  const [savingMemberPartKey, setSavingMemberPartKey] = useState<string | null>(null);
   const [adminDb, setAdminDb] = useState<{ [key: string]: true }>({});
 
   const [memberSearchTerm, setMemberSearchTerm] = useState<string>('');
@@ -117,7 +127,7 @@ export default function Home() {
   const [showAddMemberModal, setShowAddMemberModal] = useState<boolean>(false);
   const [newMemberName, setNewMemberName] = useState<string>('');
   const [newMemberCode, setNewMemberCode] = useState<string>('');
-  const [newMemberPart, setNewMemberPart] = useState<string>('포장 · 주간조');
+  const [newMemberPart, setNewMemberPart] = useState<string>(WORK_PART_OPTIONS[0]);
 
   const [showBroadcastModal, setShowBroadcastModal] = useState<boolean>(false);
   const [broadcastNotice, setBroadcastNotice] = useState<string>('');
@@ -991,7 +1001,7 @@ export default function Home() {
         const assignedPart = residenceIndex >= 0
           ? getPartFromResidence(String(row[residenceIndex] ?? '').trim())
           : null;
-        const part = assignedPart ?? '포장 · 주간조';
+        const part = assignedPart ?? WORK_PART_OPTIONS[0];
         membersByKey.set(key, {
           name: cleanName,
           code,
@@ -1051,6 +1061,41 @@ export default function Home() {
   };
 
   const toggleSelectMember = (idKey: string) => { setSelectedMembers(prev => ({ ...prev, [idKey]: !prev[idKey] })); };
+  const handleMemberPartChange = async (idKey: string, part: string) => {
+    const member = memberDb[idKey];
+    if (!member) return;
+    if (!supabase) {
+      alert('DB 연결에 실패하여 근무 파트를 저장할 수 없습니다.');
+      return;
+    }
+    if (!WORK_PART_OPTIONS.some((option) => option === part)) {
+      alert('선택한 근무 파트가 올바르지 않습니다.');
+      return;
+    }
+    if (member.part === part) return;
+
+    setSavingMemberPartKey(idKey);
+    try {
+      const { error } = await supabase.from('members')
+        .update({ part })
+        .match({ name: member.name, code: member.code });
+      if (error) {
+        alert(`근무 파트 변경에 실패했습니다: ${error.message}`);
+        return;
+      }
+
+      setMemberDb((previous) => ({
+        ...previous,
+        [idKey]: { ...previous[idKey], part },
+      }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '알 수 없는 오류';
+      alert(`근무 파트 변경 중 오류가 발생했습니다: ${message}`);
+    } finally {
+      setSavingMemberPartKey(null);
+    }
+  };
+
   const toggleSelectAll = () => {
     const tabKeys = currentTabMemberKeys;
     const isAllSelected = tabKeys.length > 0 && tabKeys.every(idKey => selectedMembers[idKey]);
@@ -1156,7 +1201,7 @@ export default function Home() {
         응답일: date,
         성명: member?.name || idKey.split('_')[0],
         코드: member?.code || idKey.split('_')[1] || '',
-        근무파트: member?.part || '포장 · 주간조',
+        근무파트: member?.part || WORK_PART_OPTIONS[0],
         출근상태: '출근 가능',
       };
     });
@@ -1208,9 +1253,19 @@ export default function Home() {
     e.preventDefault();
     const cleanName = sanitizeInput(newMemberName);
     const cleanCode = newMemberCode.trim();
-    if (!cleanName || !cleanCode || !supabase) return;
+    if (!cleanName || !cleanCode) return;
+    if (!supabase) {
+      alert('DB 연결에 실패하여 명단을 등록할 수 없습니다.');
+      return;
+    }
 
-    await supabase.from('members').insert([{ name: cleanName, code: cleanCode, part: newMemberPart, is_joined: false, is_online: false }]);
+    const { error } = await supabase.from('members').insert([
+      { name: cleanName, code: cleanCode, part: newMemberPart, is_joined: false, is_online: false },
+    ]);
+    if (error) {
+      alert(`명단 등록에 실패했습니다: ${error.message}`);
+      return;
+    }
     alert(`${cleanName}님(코드: ${cleanCode})이 등록되었습니다.`);
     setNewMemberName(''); setNewMemberCode(''); setShowAddMemberModal(false); fetchMembers();
   };
@@ -2183,7 +2238,7 @@ export default function Home() {
                                           </span>
                                         </div>
                                         <p className="text-[10px] text-slate-400 mt-0.5">
-                                          {member?.part || '포장 · 주간조'}
+                                          {member?.part || WORK_PART_OPTIONS[0]}
                                         </p>
                                       </div>
                                     </div>
@@ -2675,7 +2730,23 @@ export default function Home() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] text-slate-400 mt-0.5">{member.part}</p>
+                            <select
+                              aria-label={`${member.name} 근무 파트`}
+                              title="선택하면 근무 파트가 저장됩니다"
+                              value={WORK_PART_OPTIONS.some((part) => part === member.part) ? member.part : ''}
+                              onChange={(event) => void handleMemberPartChange(idKey, event.target.value)}
+                              disabled={savingMemberPartKey === idKey}
+                              className="mt-1 max-w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-medium text-slate-600 disabled:opacity-60"
+                            >
+                              {!WORK_PART_OPTIONS.some((part) => part === member.part) && (
+                                <option value="" disabled>
+                                  기존 파트: {member.part || '미지정'} · 변경 선택
+                                </option>
+                              )}
+                              {WORK_PART_OPTIONS.map((part) => (
+                                <option key={part} value={part}>{part}</option>
+                              ))}
+                            </select>
                             {member.scheduledWorkDate && (
                               <p className="mt-1 inline-flex rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
                                 출근 예정 · {formatDateLabel(member.scheduledWorkDate)}
@@ -2899,7 +2970,7 @@ export default function Home() {
                                     </span>
                                   </p>
                                   <p className="mt-0.5 text-[10px] text-slate-400">
-                                    {member?.part || '포장 · 주간조'}
+                                    {member?.part || WORK_PART_OPTIONS[0]}
                                   </p>
                                   </div>
                                 </div>
@@ -3123,7 +3194,7 @@ export default function Home() {
                               {member?.code || idKey.split('_')[1]}
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-400 mt-0.5">{member?.part || '포장 · 주간조'}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">{member?.part || WORK_PART_OPTIONS[0]}</p>
                           </div>
                         </div>
                         <div className="flex flex-wrap items-center justify-end gap-1">
@@ -3585,10 +3656,9 @@ export default function Home() {
                     onChange={(e) => setNewMemberPart(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl font-medium"
                   >
-                    <option value="포장 · 주간조">포장 · 주간조</option>
-                    <option value="물류/분류 · 주간조">물류/분류 · 주간조</option>
-                    <option value="포장 · 야간조">포장 · 야간조</option>
-                    <option value="피킹/검수 · 주간조">피킹/검수 · 주간조</option>
+                    {WORK_PART_OPTIONS.map((part) => (
+                      <option key={part} value={part}>{part}</option>
+                    ))}
                   </select>
                 </div>
 
