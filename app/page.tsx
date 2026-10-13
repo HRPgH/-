@@ -141,6 +141,7 @@ export default function Home() {
   const [showAvailabilitySummary, setShowAvailabilitySummary] = useState<boolean>(false);
   const [availabilityRecords, setAvailabilityRecords] = useState<AvailabilityItem[]>([]);
   const [isSavingAvailability, setIsSavingAvailability] = useState<boolean>(false);
+  const availabilityFetchInProgress = useRef(false);
 
   const [userName, setUserName] = useState<string>('');
   const [userCode, setUserCode] = useState<string>('');
@@ -279,7 +280,8 @@ export default function Home() {
   };
 
   const fetchCounts = async () => {
-    if (!supabase) return;
+    if (!supabase || availabilityFetchInProgress.current) return;
+    availabilityFetchInProgress.current = true;
     try {
       const { data: availData, error } = await supabase
         .from('work_availabilities')
@@ -289,9 +291,87 @@ export default function Home() {
         console.error('출근 응답 기록 조회 실패:', error.message);
         return;
       }
-      if (availData) setAvailabilityRecords(availData);
+      if (!availData) return;
+
+      const todayDate = getAvailabilityDateKey();
+      const todayImpossibleWorkers = Array.from(new Set(
+        availData
+          .filter((record) =>
+            record.status === 'impossible' &&
+            getAvailabilityDateKey(new Date(record.created_at)) === todayDate
+          )
+          .map((record) => record.worker_name)
+      ));
+      let hasReconciledRecords = false;
+
+      for (const workerKey of todayImpossibleWorkers) {
+        const previousRecords = availData
+          .filter((record) =>
+            record.worker_name === workerKey &&
+            getAvailabilityDateKey(new Date(record.created_at)) < todayDate
+          )
+          .sort((recordA, recordB) => recordB.created_at.localeCompare(recordA.created_at));
+        const latestPreviousRecord = previousRecords[0];
+        if (!latestPreviousRecord) continue;
+
+        const previousDate = getAvailabilityDateKey(new Date(latestPreviousRecord.created_at));
+        if (latestPreviousRecord.status === 'possible') {
+          const previousDateStart = new Date(`${previousDate}T00:00:00+09:00`);
+          const previousDateEnd = new Date(previousDateStart);
+          previousDateEnd.setUTCDate(previousDateEnd.getUTCDate() + 1);
+          const { error: updateError } = await supabase
+            .from('work_availabilities')
+            .update({ status: 'impossible' })
+            .eq('worker_name', workerKey)
+            .eq('status', 'possible')
+            .gte('created_at', previousDateStart.toISOString())
+            .lt('created_at', previousDateEnd.toISOString());
+
+          if (updateError) {
+            console.error(`이전 출근 가능 응답을 출근 어려움으로 변경하지 못했습니다 (${workerKey}):`, updateError.message);
+            continue;
+          }
+        }
+
+        const todayDateStart = new Date(`${todayDate}T00:00:00+09:00`);
+        const todayDateEnd = new Date(todayDateStart);
+        todayDateEnd.setUTCDate(todayDateEnd.getUTCDate() + 1);
+        const { error: deleteError } = await supabase
+          .from('work_availabilities')
+          .delete()
+          .eq('worker_name', workerKey)
+          .eq('status', 'impossible')
+          .gte('created_at', todayDateStart.toISOString())
+          .lt('created_at', todayDateEnd.toISOString());
+
+        if (deleteError) {
+          console.error(`중복된 오늘 출근 어려움 응답을 정리하지 못했습니다 (${workerKey}):`, deleteError.message);
+          continue;
+        }
+        hasReconciledRecords = true;
+      }
+
+      if (hasReconciledRecords) {
+        const { data: refreshedRecords, error: refreshError } = await supabase
+          .from('work_availabilities')
+          .select('worker_name, status, created_at')
+          .order('created_at', { ascending: true });
+        if (refreshError) {
+          console.error('정리된 출근 응답 기록을 다시 조회하지 못했습니다:', refreshError.message);
+          setAvailabilityRecords(availData);
+          return;
+        }
+        if (refreshedRecords) {
+          setAvailabilityRecords(refreshedRecords);
+          return;
+        }
+      }
+
+      setAvailabilityRecords(availData);
     } catch (error) {
       console.error('출근 응답 기록 조회 실패:', error);
+    } finally {
+      availabilityFetchInProgress.current = false;
     }
   };
 
