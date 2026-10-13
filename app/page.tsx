@@ -1071,6 +1071,7 @@ export default function Home() {
     setIsSavingAvailability(true);
     try {
       const isClearingResponse = workerResponses[userUniqueKey] === status;
+      let previousPossibleDate: string | null = null;
       let error;
 
       if (isClearingResponse) {
@@ -1098,6 +1099,26 @@ export default function Home() {
             return;
           }
         }
+      } else if (status === 'impossible') {
+        const previousPossibleRecord = availabilityRecords
+          .filter((record) => record.worker_name === userUniqueKey && record.status === 'possible')
+          .sort((recordA, recordB) => recordB.created_at.localeCompare(recordA.created_at))[0];
+
+        if (previousPossibleRecord) {
+          previousPossibleDate = getAvailabilityDateKey(new Date(previousPossibleRecord.created_at));
+          const responseDateStart = new Date(`${previousPossibleDate}T00:00:00+09:00`);
+          const responseDateEnd = new Date(responseDateStart);
+          responseDateEnd.setUTCDate(responseDateEnd.getUTCDate() + 1);
+          ({ error } = await supabase
+            .from('work_availabilities')
+            .update({ status: 'impossible' })
+            .eq('worker_name', userUniqueKey)
+            .eq('status', 'possible')
+            .gte('created_at', responseDateStart.toISOString())
+            .lt('created_at', responseDateEnd.toISOString()));
+        } else {
+          ({ error } = await supabase.from('work_availabilities').insert([{ worker_name: userUniqueKey, status }]));
+        }
       } else {
         ({ error } = await supabase.from('work_availabilities').insert([{ worker_name: userUniqueKey, status }]));
       }
@@ -1110,7 +1131,9 @@ export default function Home() {
         ? '출근 응답을 미제출로 변경했습니다.'
         : status === 'possible'
           ? '출근 가능으로 제출되었습니다. 이전 날짜의 출근 어려움 응답은 삭제했습니다.'
-          : '어려움으로 제출되었습니다.');
+          : previousPossibleDate
+            ? `${formatDateLabel(previousPossibleDate)} 응답을 출근 어려움으로 변경했습니다.`
+            : '어려움으로 제출되었습니다.');
       await fetchCounts();
     } catch (error) {
       const message = error instanceof Error ? error.message : '알 수 없는 오류';
