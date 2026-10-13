@@ -1713,20 +1713,31 @@ export default function Home() {
                 <label htmlFor="availability-response-date" className="text-xs font-bold text-slate-300 shrink-0">
                   응답 누른 날짜
                 </label>
-                <select
-                  id="availability-response-date"
-                  value={selectedAvailabilityDate}
-                  onChange={(event) => {
-                    setSelectedAvailabilityDate(event.target.value);
-                    setSelectedConfirmedMembers({});
-                  }}
-                  className="min-w-0 bg-slate-800 border border-slate-700 text-white text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400"
-                >
-                  <option value="all">전체 보기</option>
-                  {availabilityDates.map((date) => (
-                    <option key={date} value={date}>{formatDateLabel(date)}</option>
-                  ))}
-                </select>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <select
+                    id="availability-response-date"
+                    value={selectedAvailabilityDate}
+                    onChange={(event) => {
+                      setSelectedAvailabilityDate(event.target.value);
+                      setSelectedConfirmedMembers({});
+                    }}
+                    className="min-w-0 bg-slate-800 border border-slate-700 text-white text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400"
+                  >
+                    <option value="all">전체 보기</option>
+                    {availabilityDates.map((date) => (
+                      <option key={date} value={date}>{formatDateLabel(date)}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => {
+                      setSelectedAvailabilityDate(getAvailabilityDateKey());
+                      setSelectedConfirmedMembers({});
+                    }}
+                    className="shrink-0 rounded-lg border border-blue-400/70 bg-blue-600/20 px-2 py-1.5 text-[10px] font-bold text-blue-200 transition hover:bg-blue-600/40"
+                  >
+                    오늘 날짜
+                  </button>
+                </div>
               </div>
               {selectedAvailabilityDate === 'all' ? (
                 <div className="space-y-3 pr-1">
