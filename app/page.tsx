@@ -109,7 +109,7 @@ export default function Home() {
   const [newAdminPassword, setNewAdminPassword] = useState<string>('');
 
   const [selectedMembers, setSelectedMembers] = useState<{ [idKey: string]: boolean }>({});
-  const [scheduledWorkDateInput, setScheduledWorkDateInput] = useState(() => getAvailabilityDateKey());
+  const [scheduledWorkDateInputs, setScheduledWorkDateInputs] = useState<{ [responseDate: string]: string }>({});
   const [isSavingScheduledWorkDate, setIsSavingScheduledWorkDate] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1164,18 +1164,19 @@ export default function Home() {
     }
   };
 
-  const saveSelectedScheduledWorkDate = async (scheduledWorkDate: string | null) => {
+  const saveSelectedScheduledWorkDate = async (
+    selectedKeys: string[],
+    scheduledWorkDate: string | null
+  ) => {
     if (isSavingScheduledWorkDate) return;
     if (!supabase) {
       alert('DB 연결에 실패하여 출근 예정일을 저장할 수 없습니다.');
       return;
     }
 
-    const selectedKeys = Object.keys(selectedMembers).filter(
-      (idKey) => selectedMembers[idKey] && memberDb[idKey]
-    );
-    if (selectedKeys.length === 0) {
-      alert('출근 예정일을 지정할 인원을 먼저 선택해 주세요.');
+    const targetKeys = selectedKeys.filter((idKey) => memberDb[idKey]);
+    if (targetKeys.length === 0) {
+      alert('출근 응답 명단에서 출근 예정일을 지정할 인원을 선택해 주세요.');
       return;
     }
     if (scheduledWorkDate && !/^\d{4}-\d{2}-\d{2}$/.test(scheduledWorkDate)) {
@@ -1187,7 +1188,7 @@ export default function Home() {
     let updatedCount = 0;
     setIsSavingScheduledWorkDate(true);
     try {
-      for (const idKey of selectedKeys) {
+      for (const idKey of targetKeys) {
         const member = memberDb[idKey];
         if (!member) continue;
         const { data, error } = await supabase
@@ -2034,26 +2035,74 @@ export default function Home() {
                               전체 선택 ({dateSelectionCount}/{possible.length})
                             </button>
                             {dateSelectionCount > 0 && (
-                              <div className="grid grid-cols-2 gap-2">
-                                <button
-                                  onClick={() => {
-                                    setGroupMessageRecipientKeys(
-                                      possible.filter(
+                              <div className="space-y-2">
+                                <div className="grid grid-cols-2 gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setGroupMessageRecipientKeys(
+                                        possible.filter(
+                                          (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
+                                        )
+                                      );
+                                      setShowGroupMsgModal(true);
+                                    }}
+                                    className="justify-center bg-blue-600 hover:bg-blue-500 text-white font-bold px-2 py-2 rounded-lg text-[10px] flex items-center gap-1 transition"
+                                  >
+                                    <Send className="w-3.5 h-3.5" /> 메시지 ({dateSelectionCount})
+                                  </button>
+                                  <button
+                                    onClick={() => handleDownloadSelectedConfirmed(date, possible)}
+                                    className="justify-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2 py-2 rounded-lg text-[10px] flex items-center gap-1 transition"
+                                  >
+                                    <Download className="w-3.5 h-3.5" /> 엑셀 다운로드
+                                  </button>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-300 bg-blue-50 p-2">
+                                  <span className="text-[11px] font-bold text-blue-800">
+                                    선택 {dateSelectionCount}명 출근 예정일
+                                  </span>
+                                  <input
+                                    type="date"
+                                    value={scheduledWorkDateInputs[date] || date}
+                                    onChange={(event) =>
+                                      setScheduledWorkDateInputs((previous) => ({
+                                        ...previous,
+                                        [date]: event.target.value,
+                                      }))
+                                    }
+                                    className="min-w-0 rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-700"
+                                    aria-label={`${formatDateLabel(date)} 응답 선택 인원 출근 예정일`}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const selectedKeys = possible.filter(
                                         (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
-                                      )
-                                    );
-                                    setShowGroupMsgModal(true);
-                                  }}
-                                  className="justify-center bg-blue-600 hover:bg-blue-500 text-white font-bold px-2 py-2 rounded-lg text-[10px] flex items-center gap-1 transition"
-                                >
-                                  <Send className="w-3.5 h-3.5" /> 메시지 ({dateSelectionCount})
-                                </button>
-                                <button
-                                  onClick={() => handleDownloadSelectedConfirmed(date, possible)}
-                                  className="justify-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2 py-2 rounded-lg text-[10px] flex items-center gap-1 transition"
-                                >
-                                  <Download className="w-3.5 h-3.5" /> 엑셀 다운로드
-                                </button>
+                                      );
+                                      saveSelectedScheduledWorkDate(
+                                        selectedKeys,
+                                        scheduledWorkDateInputs[date] || date
+                                      );
+                                    }}
+                                    disabled={isSavingScheduledWorkDate}
+                                    className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60"
+                                  >
+                                    {isSavingScheduledWorkDate ? '저장 중...' : '예정일 저장'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const selectedKeys = possible.filter(
+                                        (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
+                                      );
+                                      saveSelectedScheduledWorkDate(selectedKeys, null);
+                                    }}
+                                    disabled={isSavingScheduledWorkDate}
+                                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
+                                  >
+                                    예정 해제
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -2380,35 +2429,6 @@ export default function Home() {
                   )}
                 </div>
               </div>
-
-              {selectedCount > 0 && (
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 p-2">
-                  <span className="text-[11px] font-bold text-blue-800">선택 {selectedCount}명 출근 예정일</span>
-                  <input
-                    type="date"
-                    value={scheduledWorkDateInput}
-                    onChange={(event) => setScheduledWorkDateInput(event.target.value)}
-                    className="min-w-0 rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-700"
-                    aria-label="출근 예정일"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => saveSelectedScheduledWorkDate(scheduledWorkDateInput)}
-                    disabled={isSavingScheduledWorkDate}
-                    className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60"
-                  >
-                    {isSavingScheduledWorkDate ? '저장 중...' : '예정일 저장'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => saveSelectedScheduledWorkDate(null)}
-                    disabled={isSavingScheduledWorkDate}
-                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
-                  >
-                    예정 해제
-                  </button>
-                </div>
-              )}
 
               <div className="divide-y divide-slate-100 max-h-56 overflow-y-auto">
                 {visibleMemberKeys.length === 0 ? (
