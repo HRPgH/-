@@ -128,6 +128,7 @@ export default function Home() {
 
   const [showConfirmedModal, setShowConfirmedModal] = useState<boolean>(false);
   const [showScheduledRosterModal, setShowScheduledRosterModal] = useState<boolean>(false);
+  const [selectedScheduledRosterMembers, setSelectedScheduledRosterMembers] = useState<{ [idKey: string]: boolean }>({});
   const [selectedConfirmedMembers, setSelectedConfirmedMembers] = useState<{ [idKey: string]: boolean }>({});
   const [showGroupMsgModal, setShowGroupMsgModal] = useState<boolean>(false);
   const [groupMsgText, setGroupMsgText] = useState<string>('');
@@ -257,6 +258,8 @@ export default function Home() {
   }, [availabilityRecords, memberDb]);
   const scheduledRosterDates = availabilityByDate.filter(({ scheduled }) => scheduled.length > 0);
   const scheduledRosterCount = scheduledRosterDates.reduce((count, { scheduled }) => count + scheduled.length, 0);
+  const scheduledRosterMemberKeys = scheduledRosterDates.flatMap(({ scheduled }) => scheduled);
+  const selectedScheduledRosterKeys = scheduledRosterMemberKeys.filter((idKey) => selectedScheduledRosterMembers[idKey]);
 
   const navigateToStore = (osType: 'android' | 'ios') => {
     setShowAppSelectModal(false);
@@ -791,6 +794,7 @@ export default function Home() {
     setGroupMessageRecipientKeys([]);
     setShowGroupMsgModal(false);
     setSelectedMembers({});
+    setSelectedScheduledRosterMembers({});
     await fetchMessages();
   };
 
@@ -2729,6 +2733,47 @@ export default function Home() {
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-3">
+                {scheduledRosterCount > 0 && (
+                  <div className="sticky top-0 z-10 space-y-2 rounded-xl border border-slate-200 bg-white p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const selectAll = selectedScheduledRosterKeys.length < scheduledRosterMemberKeys.length;
+                          setSelectedScheduledRosterMembers((previous) => {
+                            const updated = { ...previous };
+                            scheduledRosterMemberKeys.forEach((idKey) => {
+                              if (selectAll) updated[idKey] = true;
+                              else delete updated[idKey];
+                            });
+                            return updated;
+                          });
+                        }}
+                        className="flex items-center gap-1.5 text-[11px] font-bold text-slate-700"
+                      >
+                        {selectedScheduledRosterKeys.length === scheduledRosterMemberKeys.length ? (
+                          <CheckSquare className="h-4 w-4 text-blue-600" />
+                        ) : (
+                          <Square className="h-4 w-4 text-slate-400" />
+                        )}
+                        전체 선택 ({selectedScheduledRosterKeys.length}/{scheduledRosterCount})
+                      </button>
+                      <button
+                        type="button"
+                        disabled={selectedScheduledRosterKeys.length === 0}
+                        onClick={() => {
+                          setGroupMessageRecipientKeys(selectedScheduledRosterKeys);
+                          setShowScheduledRosterModal(false);
+                          setShowGroupMsgModal(true);
+                        }}
+                        className="flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1.5 text-[10px] font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Send className="h-3 w-3" />
+                        선택 인원 메시지 ({selectedScheduledRosterKeys.length})
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {scheduledRosterDates.length === 0 ? (
                   <div className="text-center py-12 text-slate-400 text-xs font-medium">
                     아직 출근 예정으로 지정된 인원이 없습니다.
@@ -2762,7 +2807,25 @@ export default function Home() {
                               className="space-y-2 rounded-xl border border-slate-200 bg-white px-3 py-2"
                             >
                               <div className="flex items-center justify-between gap-2">
-                                <div>
+                                <div className="flex min-w-0 items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setSelectedScheduledRosterMembers((previous) => ({
+                                        ...previous,
+                                        [idKey]: !previous[idKey],
+                                      }))
+                                    }
+                                    className="shrink-0"
+                                    aria-label={`${member?.name || idKey.split('_')[0]} 메시지 수신 인원 선택`}
+                                  >
+                                    {selectedScheduledRosterMembers[idKey] ? (
+                                      <CheckSquare className="h-4 w-4 text-blue-600" />
+                                    ) : (
+                                      <Square className="h-4 w-4 text-slate-300" />
+                                    )}
+                                  </button>
+                                  <div className="min-w-0">
                                   <p className="text-xs font-bold text-slate-800">
                                     {member?.name || idKey.split('_')[0]}
                                     <span className="ml-1.5 font-mono text-[10px] text-blue-700">
@@ -2772,6 +2835,7 @@ export default function Home() {
                                   <p className="mt-0.5 text-[10px] text-slate-400">
                                     {member?.part || '포장 · 주간조'}
                                   </p>
+                                  </div>
                                 </div>
                                 <span className="shrink-0 rounded-lg bg-blue-100 px-2 py-1 text-[10px] font-bold text-blue-700">
                                   출근 예정
