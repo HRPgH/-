@@ -2940,7 +2940,11 @@ export default function Home() {
 
         {showConfirmedModal && (
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white w-full rounded-3xl p-5 shadow-2xl space-y-4 max-h-[500px] flex flex-col border border-slate-200">
+            <div
+              className="bg-white w-full rounded-3xl p-5 shadow-2xl space-y-4 max-h-[500px] flex flex-col border border-slate-200"
+              onTouchStart={handleAvailabilitySwipeStart}
+              onTouchEnd={handleAvailabilitySwipeEnd}
+            >
               <div className="flex justify-between items-center border-b pb-3">
                 <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
                   <CheckCircle className="w-4 h-4 text-emerald-600" /> 출근 응답 명단 · {formatDateLabel(selectedAvailabilityDate)} ({confirmedCount}명)
