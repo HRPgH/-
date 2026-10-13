@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Bus, Bell, Key, User, ShieldCheck, AlertTriangle, BookOpen, Info, Plus, Trash2, Users, Send, MessageSquare, X, Megaphone, CheckCircle, FileSpreadsheet, CheckSquare, Square, UserCog, Bot, Phone, FileText, Check, Search, UserMinus, UserCheck, LogOut, ChevronRight, Clock, Download, Smartphone } from 'lucide-react';
+import { Bus, Bell, Key, User, ShieldCheck, AlertTriangle, BookOpen, Info, Plus, Trash2, Users, Send, MessageSquare, X, Megaphone, CheckCircle, CalendarDays, FileSpreadsheet, CheckSquare, Square, UserCog, Bot, Phone, FileText, Check, Search, UserMinus, UserCheck, LogOut, ChevronRight, Clock, Download, Smartphone } from 'lucide-react';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 
@@ -126,6 +126,7 @@ export default function Home() {
   const [showNotificationMenu, setShowNotificationMenu] = useState<boolean>(false);
 
   const [showConfirmedModal, setShowConfirmedModal] = useState<boolean>(false);
+  const [showScheduledRosterModal, setShowScheduledRosterModal] = useState<boolean>(false);
   const [selectedConfirmedMembers, setSelectedConfirmedMembers] = useState<{ [idKey: string]: boolean }>({});
   const [showGroupMsgModal, setShowGroupMsgModal] = useState<boolean>(false);
   const [groupMsgText, setGroupMsgText] = useState<string>('');
@@ -253,6 +254,8 @@ export default function Home() {
     });
     return Array.from(dates).sort((a, b) => b.localeCompare(a));
   }, [availabilityRecords, memberDb]);
+  const scheduledRosterDates = availabilityByDate.filter(({ scheduled }) => scheduled.length > 0);
+  const scheduledRosterCount = scheduledRosterDates.reduce((count, { scheduled }) => count + scheduled.length, 0);
 
   const navigateToStore = (osType: 'android' | 'ios') => {
     setShowAppSelectModal(false);
@@ -1927,30 +1930,39 @@ export default function Home() {
                 <label htmlFor="availability-response-date" className="text-xs font-bold text-slate-300 shrink-0">
                   응답 누른 날짜
                 </label>
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <select
-                    id="availability-response-date"
-                    value={selectedAvailabilityDate}
-                    onChange={(event) => {
-                      setSelectedAvailabilityDate(event.target.value);
-                      setSelectedConfirmedMembers({});
-                    }}
-                    className="min-w-0 bg-slate-800 border border-slate-700 text-white text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400"
-                  >
-                    <option value="all">전체 보기</option>
-                    {availabilityDates.map((date) => (
-                      <option key={date} value={date}>{formatDateLabel(date)}</option>
-                    ))}
-                  </select>
+                <div className="flex min-w-0 flex-col items-end gap-1.5">
                   <button
-                    onClick={() => {
-                      setSelectedAvailabilityDate(getAvailabilityDateKey());
-                      setSelectedConfirmedMembers({});
-                    }}
-                    className="shrink-0 rounded-lg border border-blue-400/70 bg-blue-600/20 px-2 py-1.5 text-[10px] font-bold text-blue-200 transition hover:bg-blue-600/40"
+                    type="button"
+                    onClick={() => setShowScheduledRosterModal(true)}
+                    className="w-full rounded-lg border border-emerald-400/70 bg-emerald-500/15 px-2 py-1.5 text-[10px] font-bold text-emerald-200 transition hover:bg-emerald-500/30"
                   >
-                    오늘 날짜
+                    출근 예정 명단 확인 ({scheduledRosterCount}명)
                   </button>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <select
+                      id="availability-response-date"
+                      value={selectedAvailabilityDate}
+                      onChange={(event) => {
+                        setSelectedAvailabilityDate(event.target.value);
+                        setSelectedConfirmedMembers({});
+                      }}
+                      className="min-w-0 bg-slate-800 border border-slate-700 text-white text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400"
+                    >
+                      <option value="all">전체 보기</option>
+                      {availabilityDates.map((date) => (
+                        <option key={date} value={date}>{formatDateLabel(date)}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => {
+                        setSelectedAvailabilityDate(getAvailabilityDateKey());
+                        setSelectedConfirmedMembers({});
+                      }}
+                      className="shrink-0 rounded-lg border border-blue-400/70 bg-blue-600/20 px-2 py-1.5 text-[10px] font-bold text-blue-200 transition hover:bg-blue-600/40"
+                    >
+                      오늘 날짜
+                    </button>
+                  </div>
                 </div>
               </div>
               {selectedAvailabilityDate === 'all' ? (
@@ -2695,6 +2707,87 @@ export default function Home() {
                   })
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {showScheduledRosterModal && (
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white w-full rounded-3xl p-5 shadow-2xl space-y-4 max-h-[600px] flex flex-col border border-slate-200">
+              <div className="flex justify-between items-center border-b pb-3">
+                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                  <CalendarDays className="w-4 h-4 text-emerald-600" /> 출근 예정 명단 ({scheduledRosterCount}명)
+                </h3>
+                <button
+                  onClick={() => setShowScheduledRosterModal(false)}
+                  className="text-slate-400 text-sm font-bold"
+                  aria-label="출근 예정 명단 닫기"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3">
+                {scheduledRosterDates.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 text-xs font-medium">
+                    아직 출근 예정으로 지정된 인원이 없습니다.
+                  </div>
+                ) : (
+                  scheduledRosterDates.map(({ date, scheduled }) => (
+                    <section key={date} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <h4 className="text-xs font-black text-slate-800">
+                          {formatDateLabel(date)} · {scheduled.length}명
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedAvailabilityDate(date);
+                            setSelectedConfirmedMembers({});
+                            setShowScheduledRosterModal(false);
+                          }}
+                          className="rounded-lg border border-blue-200 bg-white px-2 py-1 text-[10px] font-bold text-blue-700 transition hover:bg-blue-50"
+                        >
+                          날짜별 응답 보기
+                        </button>
+                      </div>
+                      <div className="space-y-1.5">
+                        {scheduled.map((idKey) => {
+                          const member = memberDb[idKey];
+                          return (
+                            <div
+                              key={idKey}
+                              className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2"
+                            >
+                              <div>
+                                <p className="text-xs font-bold text-slate-800">
+                                  {member?.name || idKey.split('_')[0]}
+                                  <span className="ml-1.5 font-mono text-[10px] text-blue-700">
+                                    {member?.code || idKey.split('_')[1]}
+                                  </span>
+                                </p>
+                                <p className="mt-0.5 text-[10px] text-slate-400">
+                                  {member?.part || '포장 · 주간조'}
+                                </p>
+                              </div>
+                              <span className="shrink-0 rounded-lg bg-blue-100 px-2 py-1 text-[10px] font-bold text-blue-700">
+                                출근 예정
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  ))
+                )}
+              </div>
+
+              <button
+                onClick={() => setShowScheduledRosterModal(false)}
+                className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl text-xs"
+              >
+                닫기
+              </button>
             </div>
           </div>
         )}
