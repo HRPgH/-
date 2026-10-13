@@ -83,7 +83,7 @@ function getBotResponse(userMsg: string): string {
   return '🤖 말씀해 주신 내용은 챗봇으로 답변하기 어렵습니다.\n\n상세한 문의 사항은 담당 관리자 번호(☎️ 054-450-8618)로 연락 주시면 친절히 안내해 드리겠습니다!';
 }
 
-interface MemberItem { idKey: string; name: string; code: string; part: string; isJoined?: boolean; isNoShow?: boolean; resignedAt?: string | null; withdrawnAt?: string | null; isOnline?: boolean; lastLoginAt?: string | null; }
+interface MemberItem { idKey: string; name: string; code: string; part: string; isJoined?: boolean; isNoShow?: boolean; resignedAt?: string | null; withdrawnAt?: string | null; isOnline?: boolean; lastLoginAt?: string | null; scheduledWorkDate?: string | null; }
 interface MessageItem { id?: number; sender_name: string; sender_role: 'worker' | 'admin'; receiver_name: string; message: string; is_read?: boolean; created_at?: string; }
 interface AnnouncementItem { id: number; title: string; content: string; created_at: string; }
 interface AvailabilityItem { worker_name: string; status: 'possible' | 'impossible'; created_at: string; }
@@ -109,6 +109,7 @@ export default function Home() {
   const [newAdminPassword, setNewAdminPassword] = useState<string>('');
 
   const [selectedMembers, setSelectedMembers] = useState<{ [idKey: string]: boolean }>({});
+  const [scheduledWorkDateInput, setScheduledWorkDateInput] = useState(() => getAvailabilityDateKey());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showAddMemberModal, setShowAddMemberModal] = useState<boolean>(false);
@@ -212,6 +213,7 @@ export default function Home() {
     const responsesByDate: {
       [date: string]: { [workerKey: string]: 'possible' | 'impossible' };
     } = {};
+    const scheduledByDate: { [date: string]: string[] } = {};
 
     availabilityRecords.forEach((record) => {
       const date = getAvailabilityDateKey(new Date(record.created_at));
@@ -219,7 +221,17 @@ export default function Home() {
       responsesByDate[date][record.worker_name] = record.status;
     });
 
-    return Array.from(new Set([getAvailabilityDateKey(), ...Object.keys(responsesByDate)]))
+    Object.entries(memberDb).forEach(([workerKey, member]) => {
+      if (!member.scheduledWorkDate) return;
+      if (!scheduledByDate[member.scheduledWorkDate]) scheduledByDate[member.scheduledWorkDate] = [];
+      scheduledByDate[member.scheduledWorkDate].push(workerKey);
+    });
+
+    return Array.from(new Set([
+      getAvailabilityDateKey(),
+      ...Object.keys(responsesByDate),
+      ...Object.keys(scheduledByDate),
+    ]))
       .sort((dateA, dateB) => dateB.localeCompare(dateA))
       .map((date) => {
         const responses = responsesByDate[date] || {};
@@ -228,14 +240,18 @@ export default function Home() {
           responses,
           possible: Object.keys(responses).filter((workerKey) => responses[workerKey] === 'possible'),
           impossible: Object.keys(responses).filter((workerKey) => responses[workerKey] === 'impossible'),
+          scheduled: scheduledByDate[date] || [],
         };
       });
-  }, [availabilityRecords]);
+  }, [availabilityRecords, memberDb]);
   const availabilityDates = useMemo(() => {
     const dates = new Set([getAvailabilityDateKey()]);
     availabilityRecords.forEach((record) => dates.add(getAvailabilityDateKey(new Date(record.created_at))));
+    Object.values(memberDb).forEach((member) => {
+      if (member.scheduledWorkDate) dates.add(member.scheduledWorkDate);
+    });
     return Array.from(dates).sort((a, b) => b.localeCompare(a));
-  }, [availabilityRecords]);
+  }, [availabilityRecords, memberDb]);
 
   const navigateToStore = (osType: 'android' | 'ios') => {
     setShowAppSelectModal(false);
@@ -271,7 +287,8 @@ export default function Home() {
             isJoined: item.is_joined === true, isNoShow: item.is_no_show === true,
             resignedAt: item.resigned_at || null,
             withdrawnAt: item.withdrawn_at || null,
-            isOnline: item.is_online === true, lastLoginAt: item.last_login_at
+            isOnline: item.is_online === true, lastLoginAt: item.last_login_at,
+            scheduledWorkDate: item.scheduled_work_date || null
           };
         });
         setMemberDb(dbMap);
@@ -1146,6 +1163,51 @@ export default function Home() {
     }
   };
 
+  const saveSelectedScheduledWorkDate = async (scheduledWorkDate: string | null) => {
+    if (!supabase) {
+      alert('DB 연결에 실패하여 출근 예정일을 저장할 수 없습니다.');
+      return;
+    }
+
+    const selectedKeys = Object.keys(selectedMembers).filter(
+      (idKey) => selectedMembers[idKey] && memberDb[idKey]
+    );
+    if (selectedKeys.length === 0) {
+      alert('출근 예정일을 지정할 인원을 먼저 선택해 주세요.');
+      return;
+    }
+    if (scheduledWorkDate && !/^\d{4}-\d{2}-\d{2}$/.test(scheduledWorkDate)) {
+      alert('올바른 출근 예정일을 선택해 주세요.');
+      return;
+    }
+
+    const failures: string[] = [];
+    let updatedCount = 0;
+    for (const idKey of selectedKeys) {
+      const member = memberDb[idKey];
+      if (!member) continue;
+      const { error } = await supabase
+        .from('members')
+        .update({ scheduled_work_date: scheduledWorkDate })
+        .match({ name: member.name, code: member.code });
+
+      if (error) failures.push(`${member.name}: ${error.message}`);
+      else updatedCount++;
+    }
+
+    if (updatedCount > 0) await fetchMembers();
+    if (failures.length > 0) {
+      alert(
+        `${updatedCount}명 저장, ${failures.length}명 실패했습니다.\n${failures.slice(0, 3).join('\n')}${failures.length > 3 ? '\n외 추가 오류가 있습니다.' : ''}\nSupabase에 scheduled_work_date 컬럼이 없으면 README의 DB 설정 절차를 먼저 완료해 주세요.`
+      );
+      return;
+    }
+
+    alert(scheduledWorkDate
+      ? `${updatedCount}명의 출근 예정일을 ${formatDateLabel(scheduledWorkDate)}로 저장했습니다.`
+      : `${updatedCount}명의 출근 예정일을 해제했습니다.`);
+  };
+
   const handleResponse = async (status: 'possible' | 'impossible') => {
     if (!supabase || isSavingAvailability) return;
     setIsSavingAvailability(true);
@@ -1891,7 +1953,7 @@ export default function Home() {
                   </button>
                   {showAvailabilitySummary ? (
                     <div className="space-y-2">
-                      {availabilityByDate.map(({ date, possible, impossible }) => (
+                      {availabilityByDate.map(({ date, possible, impossible, scheduled }) => (
                         <div key={date} className="bg-slate-800 border border-slate-700 rounded-xl p-3">
                           <div className="flex items-center justify-between gap-2 mb-2">
                             <h2 className="text-sm font-black">{formatDateLabel(date)}</h2>
@@ -1906,7 +1968,7 @@ export default function Home() {
                             </button>
                           </div>
                           <p className="text-[11px] text-slate-300 mb-2">
-                            출근 가능 {possible.length}명 · 출근 불가 {impossible.length}명 · 미응답 {Math.max(targetTotal - possible.length - impossible.length, 0)}명
+                            출근 가능 {possible.length}명 · 출근 불가 {impossible.length}명 · 출근 예정 {scheduled.length}명 · 미응답 {Math.max(targetTotal - possible.length - impossible.length, 0)}명
                           </p>
                           {possible.length > 0 && (
                             <p className="text-[10px] leading-relaxed text-emerald-300">
@@ -1918,26 +1980,34 @@ export default function Home() {
                               불가: {impossible.map((workerKey) => memberDb[workerKey]?.name || workerKey.split('_')[0]).join(', ')}
                             </p>
                           )}
+                          {scheduled.length > 0 && (
+                            <p className="text-[10px] leading-relaxed text-blue-300 mt-1">
+                              출근 예정: {scheduled.map((workerKey) => memberDb[workerKey]?.name || workerKey.split('_')[0]).join(', ')}
+                            </p>
+                          )}
                           {possible.length === 0 && impossible.length === 0 && (
-                            <p className="text-[10px] text-slate-400">아직 응답이 없습니다.</p>
+                            <p className="text-[10px] text-slate-400">
+                              {scheduled.length > 0 ? '아직 응답한 인원은 없습니다.' : '아직 응답이 없습니다.'}
+                            </p>
                           )}
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div className="space-y-2">
-                  {availabilityByDate.map(({ date, possible, impossible }) => {
+                  {availabilityByDate.map(({ date, responses, possible, impossible, scheduled }) => {
                     const dateSelectionCount = possible.filter(
                       (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
                     ).length;
                     const isDateAllSelected = possible.length > 0 && dateSelectionCount === possible.length;
+                    const listedWorkerKeys = Array.from(new Set([...possible, ...impossible, ...scheduled]));
 
                     return (
                       <section key={date} className="bg-slate-900 border border-slate-700 rounded-2xl p-3.5">
                         <div className="flex items-center gap-2 border-b border-slate-700 pb-2.5">
                           <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
                           <h2 className="min-w-0 flex-1 text-xs font-black text-white">
-                            출근 응답 명단 · {formatDateLabel(date)} (가능 {possible.length}명 · 어려움 {impossible.length}명)
+                            출근 응답 명단 · {formatDateLabel(date)} (가능 {possible.length}명 · 어려움 {impossible.length}명 · 예정 {scheduled.length}명)
                           </h2>
                         </div>
 
@@ -1981,20 +2051,18 @@ export default function Home() {
                         )}
 
                         <div className="space-y-2">
-                          {possible.length === 0 && impossible.length === 0 ? (
+                          {listedWorkerKeys.length === 0 ? (
                             <p className="py-5 text-center text-[11px] text-slate-400">
-                              해당 날짜에 응답한 인원이 없습니다.
+                              해당 날짜에 응답하거나 출근 예정인 인원이 없습니다.
                             </p>
                           ) : (
-                            [
-                              { status: 'possible' as const, workerKeys: possible },
-                              { status: 'impossible' as const, workerKeys: impossible },
-                            ].flatMap(({ status, workerKeys }) =>
-                              workerKeys.map((idKey) => {
+                            listedWorkerKeys.map((idKey) => {
                                 const member = memberDb[idKey];
                                 const selectionKey = getConfirmedSelectionKey(date, idKey);
                                 const isSelected = !!selectedConfirmedMembers[selectionKey];
-                                const isPossible = status === 'possible';
+                                const responseStatus = responses[idKey];
+                                const isPossible = responseStatus === 'possible';
+                                const isScheduled = scheduled.includes(idKey);
 
                                 return (
                                   <div
@@ -2036,17 +2104,27 @@ export default function Home() {
                                         </p>
                                       </div>
                                     </div>
-                                    <span className={`font-bold px-2 py-1 rounded-lg text-[10px] ${
-                                      isPossible
-                                        ? 'bg-emerald-100 text-emerald-700'
-                                        : 'bg-rose-100 text-rose-700'
-                                    }`}>
-                                      {isPossible ? '출근 가능' : '출근 어려움'}
-                                    </span>
+                                    <div className="flex flex-col items-end gap-1">
+                                      {responseStatus ? (
+                                        <span className={`font-bold px-2 py-1 rounded-lg text-[10px] ${
+                                          isPossible ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                                        }`}>
+                                          {isPossible ? '출근 가능' : '출근 어려움'}
+                                        </span>
+                                      ) : (
+                                        <span className="font-bold px-2 py-1 rounded-lg text-[10px] bg-slate-200 text-slate-600">
+                                          응답 전
+                                        </span>
+                                      )}
+                                      {isScheduled && (
+                                        <span className="font-bold px-2 py-1 rounded-lg text-[10px] bg-blue-100 text-blue-700">
+                                          출근 예정
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 );
                               })
-                            )
                           )}
                         </div>
                       </section>
@@ -2073,6 +2151,19 @@ export default function Home() {
                   >
                     출근 명단 확인 · {formatDateLabel(selectedAvailabilityDate)} ({confirmedCount}명)
                   </button>
+                  {Object.entries(memberDb).some(([, member]) => member.scheduledWorkDate === selectedAvailabilityDate) && (
+                    <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 p-3">
+                      <p className="text-xs font-bold text-blue-800 mb-1">
+                        출근 예정 · {Object.entries(memberDb).filter(([, member]) => member.scheduledWorkDate === selectedAvailabilityDate).length}명
+                      </p>
+                      <p className="text-[11px] leading-relaxed text-blue-700">
+                        {Object.entries(memberDb)
+                          .filter(([, member]) => member.scheduledWorkDate === selectedAvailabilityDate)
+                          .map(([, member]) => `${member.name} (${member.code})`)
+                          .join(', ')}
+                      </p>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -2280,6 +2371,33 @@ export default function Home() {
                   )}
                 </div>
               </div>
+
+              {selectedCount > 0 && (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 p-2">
+                  <span className="text-[11px] font-bold text-blue-800">선택 {selectedCount}명 출근 예정일</span>
+                  <input
+                    type="date"
+                    value={scheduledWorkDateInput}
+                    onChange={(event) => setScheduledWorkDateInput(event.target.value)}
+                    className="min-w-0 rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-700"
+                    aria-label="출근 예정일"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => saveSelectedScheduledWorkDate(scheduledWorkDateInput)}
+                    className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-blue-500"
+                  >
+                    예정일 저장
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => saveSelectedScheduledWorkDate(null)}
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 transition hover:bg-slate-100"
+                  >
+                    예정 해제
+                  </button>
+                </div>
+              )}
 
               <div className="divide-y divide-slate-100 max-h-56 overflow-y-auto">
                 {visibleMemberKeys.length === 0 ? (
@@ -2492,6 +2610,11 @@ export default function Home() {
                               )}
                             </div>
                             <p className="text-[11px] text-slate-400 mt-0.5">{member.part}</p>
+                            {member.scheduledWorkDate && (
+                              <p className="mt-1 inline-flex rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-700">
+                                출근 예정 · {formatDateLabel(member.scheduledWorkDate)}
+                              </p>
+                            )}
                           </div>
                         </div>
 
