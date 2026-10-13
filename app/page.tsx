@@ -2070,7 +2070,7 @@ export default function Home() {
 
             <div
               className={`bg-slate-900 text-white p-5 rounded-2xl shadow-xl ${
-                isAdminPcView ? 'self-start lg:col-span-5 lg:row-start-3' : ''
+                isAdminPcView ? 'self-start lg:col-span-4 lg:row-start-3' : ''
               }`}
               onTouchStart={handleAvailabilitySwipeStart}
               onTouchEnd={handleAvailabilitySwipeEnd}
@@ -2384,7 +2384,7 @@ export default function Home() {
             </div>
 
             <div className={`bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3 ${
-              isAdminPcView ? 'lg:col-span-7 lg:row-start-3 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden' : ''
+              isAdminPcView ? 'lg:col-span-8 lg:row-start-3 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden' : ''
             }`}>
               <div className="flex justify-between items-center border-b pb-2.5">
                 <div className="flex items-center gap-1.5">
