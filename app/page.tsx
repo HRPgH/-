@@ -1083,6 +1083,21 @@ export default function Home() {
           .eq('worker_name', userUniqueKey)
           .gte('created_at', responseDateStart.toISOString())
           .lt('created_at', responseDateEnd.toISOString()));
+      } else if (status === 'possible') {
+        ({ error } = await supabase.from('work_availabilities').insert([{ worker_name: userUniqueKey, status }]));
+        if (!error) {
+          const { error: cleanupError } = await supabase
+            .from('work_availabilities')
+            .delete()
+            .eq('worker_name', userUniqueKey)
+            .eq('status', 'impossible');
+
+          if (cleanupError) {
+            alert(`출근 가능 응답은 저장했지만 이전 날짜의 어려움 응답을 삭제하지 못했습니다: ${cleanupError.message}`);
+            await fetchCounts();
+            return;
+          }
+        }
       } else {
         ({ error } = await supabase.from('work_availabilities').insert([{ worker_name: userUniqueKey, status }]));
       }
@@ -1093,7 +1108,9 @@ export default function Home() {
       }
       alert(isClearingResponse
         ? '출근 응답을 미제출로 변경했습니다.'
-        : status === 'possible' ? '출근 가능으로 제출되었습니다!' : '어려움으로 제출되었습니다.');
+        : status === 'possible'
+          ? '출근 가능으로 제출되었습니다. 이전 날짜의 출근 어려움 응답은 삭제했습니다.'
+          : '어려움으로 제출되었습니다.');
       await fetchCounts();
     } catch (error) {
       const message = error instanceof Error ? error.message : '알 수 없는 오류';
