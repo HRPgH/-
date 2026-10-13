@@ -1983,9 +1983,9 @@ export default function Home() {
         )}
 
         {isLoggedIn && activeViewMode === 'admin' && (
-          <div className={isAdminPcView ? 'grid grid-cols-1 gap-5 lg:h-full lg:min-h-0 lg:grid-cols-12 lg:grid-rows-[auto_auto_minmax(0,1fr)] lg:gap-3' : 'space-y-5'}>
+          <div className={isAdminPcView ? 'grid grid-cols-1 gap-5 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(300px,1fr)_minmax(0,4fr)] lg:grid-rows-[auto_auto_minmax(0,1fr)] lg:gap-3' : 'space-y-5'}>
             <div className={`flex justify-between items-center ${
-              isAdminPcView ? 'lg:col-span-12 lg:row-start-1 rounded-2xl bg-white px-4 py-2.5 shadow-sm border border-slate-200/80' : ''
+              isAdminPcView ? 'lg:col-span-full lg:row-start-1 rounded-2xl bg-white px-4 py-1.5 shadow-sm border border-slate-200/80' : ''
             }`}>
               <div>
                 <span className="text-xs font-black tracking-wider text-blue-600">올품(아르바이트) 채용 도우미 관리자</span>
@@ -2070,7 +2070,7 @@ export default function Home() {
 
             <div
               className={`bg-slate-900 text-white p-5 rounded-2xl shadow-xl ${
-                isAdminPcView ? 'self-start lg:col-span-3 lg:row-start-3' : ''
+                isAdminPcView ? 'lg:col-start-1 lg:row-start-3 lg:flex lg:min-h-0 lg:flex-col lg:justify-between lg:gap-6' : ''
               }`}
               onTouchStart={handleAvailabilitySwipeStart}
               onTouchEnd={handleAvailabilitySwipeEnd}
@@ -2358,7 +2358,7 @@ export default function Home() {
             </div>
 
             <div className={`bg-amber-50 border border-amber-200/80 p-3.5 rounded-2xl flex items-center justify-between gap-2 ${
-              isAdminPcView ? 'lg:col-span-12 lg:row-start-2' : ''
+              isAdminPcView ? 'lg:col-span-full lg:row-start-2 lg:p-2.5' : ''
             }`}>
               <div className="flex items-center gap-2">
                 <Megaphone className="w-4 h-4 text-amber-600 shrink-0" />
@@ -2384,7 +2384,7 @@ export default function Home() {
             </div>
 
             <div className={`bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3 ${
-              isAdminPcView ? 'lg:col-span-9 lg:row-start-3 lg:flex lg:min-h-0 lg:self-stretch lg:flex-col lg:overflow-hidden' : ''
+              isAdminPcView ? 'lg:col-start-2 lg:row-start-3 lg:flex lg:min-h-0 lg:self-stretch lg:flex-col lg:overflow-hidden' : ''
             }`}>
               <div className="flex justify-between items-center border-b pb-2.5">
                 <div className="flex items-center gap-1.5">
