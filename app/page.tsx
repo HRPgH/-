@@ -138,6 +138,7 @@ export default function Home() {
   const [failedAttempts, setFailedAttempts] = useState<number>(0);
   const [isLockedOut, setIsLockedOut] = useState<boolean>(false);
   const [selectedAvailabilityDate, setSelectedAvailabilityDate] = useState<string>(() => getAvailabilityDateKey());
+  const [showAvailabilitySummary, setShowAvailabilitySummary] = useState<boolean>(false);
   const [availabilityRecords, setAvailabilityRecords] = useState<AvailabilityItem[]>([]);
   const [isSavingAvailability, setIsSavingAvailability] = useState<boolean>(false);
 
@@ -1728,7 +1729,50 @@ export default function Home() {
                 </select>
               </div>
               {selectedAvailabilityDate === 'all' ? (
-                <div className="space-y-2 pr-1">
+                <div className="space-y-3 pr-1">
+                  <button
+                    onClick={() => setShowAvailabilitySummary((showSummary) => !showSummary)}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-xs font-bold text-blue-200 transition hover:bg-slate-700"
+                  >
+                    {showAvailabilitySummary ? '날짜별 명단 보기' : '이전 요약 화면 보기'}
+                  </button>
+                  {showAvailabilitySummary ? (
+                    <div className="space-y-2">
+                      {availabilityByDate.map(({ date, possible, impossible }) => (
+                        <div key={date} className="bg-slate-800 border border-slate-700 rounded-xl p-3">
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <h2 className="text-sm font-black">{formatDateLabel(date)}</h2>
+                            <button
+                              onClick={() => {
+                                setSelectedAvailabilityDate(date);
+                                setSelectedConfirmedMembers({});
+                              }}
+                              className="text-[10px] font-bold text-blue-300 hover:text-white"
+                            >
+                              자세히 보기
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-slate-300 mb-2">
+                            출근 가능 {possible.length}명 · 출근 불가 {impossible.length}명 · 미응답 {Math.max(targetTotal - possible.length - impossible.length, 0)}명
+                          </p>
+                          {possible.length > 0 && (
+                            <p className="text-[10px] leading-relaxed text-emerald-300">
+                              가능: {possible.map((workerKey) => memberDb[workerKey]?.name || workerKey.split('_')[0]).join(', ')}
+                            </p>
+                          )}
+                          {impossible.length > 0 && (
+                            <p className="text-[10px] leading-relaxed text-rose-300 mt-1">
+                              불가: {impossible.map((workerKey) => memberDb[workerKey]?.name || workerKey.split('_')[0]).join(', ')}
+                            </p>
+                          )}
+                          {possible.length === 0 && impossible.length === 0 && (
+                            <p className="text-[10px] text-slate-400">아직 응답이 없습니다.</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
                   {availabilityByDate.map(({ date, possible }) => {
                     const dateSelectionCount = possible.filter(
                       (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
@@ -1841,6 +1885,8 @@ export default function Home() {
                       </section>
                     );
                   })}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <>
