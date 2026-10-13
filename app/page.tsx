@@ -1983,7 +1983,7 @@ export default function Home() {
         )}
 
         {isLoggedIn && activeViewMode === 'admin' && (
-          <div className={isAdminPcView ? 'grid grid-cols-1 gap-5 lg:grid-cols-12' : 'space-y-5'}>
+          <div className={isAdminPcView ? 'grid grid-cols-1 items-start gap-5 lg:grid-cols-12' : 'space-y-5'}>
             <div className={`flex justify-between items-center ${
               isAdminPcView ? 'lg:col-span-12 rounded-2xl bg-white px-5 py-4 shadow-sm border border-slate-200/80' : ''
             }`}>
@@ -2070,7 +2070,7 @@ export default function Home() {
 
             <div
               className={`bg-slate-900 text-white p-5 rounded-2xl shadow-xl ${
-                isAdminPcView ? 'lg:col-span-5 lg:row-start-3' : ''
+                isAdminPcView ? 'self-start lg:col-span-5 lg:row-start-3' : ''
               }`}
               onTouchStart={handleAvailabilitySwipeStart}
               onTouchEnd={handleAvailabilitySwipeEnd}
