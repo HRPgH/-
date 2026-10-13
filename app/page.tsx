@@ -1784,7 +1784,7 @@ export default function Home() {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                  {availabilityByDate.map(({ date, possible }) => {
+                  {availabilityByDate.map(({ date, possible, impossible }) => {
                     const dateSelectionCount = possible.filter(
                       (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
                     ).length;
@@ -1795,7 +1795,7 @@ export default function Home() {
                         <div className="flex items-center gap-2 border-b border-slate-700 pb-2.5">
                           <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
                           <h2 className="min-w-0 flex-1 text-xs font-black text-white">
-                            출근 응답 명단 · {formatDateLabel(date)} ({possible.length}명)
+                            출근 응답 명단 · {formatDateLabel(date)} (가능 {possible.length}명 · 어려움 {impossible.length}명)
                           </h2>
                         </div>
 
@@ -1839,58 +1839,72 @@ export default function Home() {
                         )}
 
                         <div className="space-y-2">
-                          {possible.length === 0 ? (
+                          {possible.length === 0 && impossible.length === 0 ? (
                             <p className="py-5 text-center text-[11px] text-slate-400">
-                              해당 날짜에 출근 가능 응답자가 없습니다.
+                              해당 날짜에 응답한 인원이 없습니다.
                             </p>
                           ) : (
-                            possible.map((idKey) => {
-                              const member = memberDb[idKey];
-                              const selectionKey = getConfirmedSelectionKey(date, idKey);
-                              const isSelected = !!selectedConfirmedMembers[selectionKey];
+                            [
+                              { status: 'possible' as const, workerKeys: possible },
+                              { status: 'impossible' as const, workerKeys: impossible },
+                            ].flatMap(({ status, workerKeys }) =>
+                              workerKeys.map((idKey) => {
+                                const member = memberDb[idKey];
+                                const selectionKey = getConfirmedSelectionKey(date, idKey);
+                                const isSelected = !!selectedConfirmedMembers[selectionKey];
+                                const isPossible = status === 'possible';
 
-                              return (
-                                <div
-                                  key={idKey}
-                                  className="bg-slate-50 border border-slate-200 p-3 rounded-2xl flex justify-between items-center text-xs"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      onClick={() =>
-                                        setSelectedConfirmedMembers((prev) => ({
-                                          ...prev,
-                                          [selectionKey]: !prev[selectionKey],
-                                        }))
-                                      }
-                                      className="text-slate-400"
-                                      aria-label={`${member?.name || idKey.split('_')[0]} 선택`}
-                                    >
-                                      {isSelected ? (
-                                        <CheckSquare className="w-4 h-4 text-blue-600" />
+                                return (
+                                  <div
+                                    key={idKey}
+                                    className="bg-slate-50 border border-slate-200 p-3 rounded-2xl flex justify-between items-center text-xs"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      {isPossible ? (
+                                        <button
+                                          onClick={() =>
+                                            setSelectedConfirmedMembers((prev) => ({
+                                              ...prev,
+                                              [selectionKey]: !prev[selectionKey],
+                                            }))
+                                          }
+                                          className="text-slate-400"
+                                          aria-label={`${member?.name || idKey.split('_')[0]} 선택`}
+                                        >
+                                          {isSelected ? (
+                                            <CheckSquare className="w-4 h-4 text-blue-600" />
+                                          ) : (
+                                            <Square className="w-4 h-4 text-slate-300" />
+                                          )}
+                                        </button>
                                       ) : (
-                                        <Square className="w-4 h-4 text-slate-300" />
+                                        <span className="w-4" aria-hidden="true" />
                                       )}
-                                    </button>
-                                    <div>
-                                      <div className="flex items-center gap-1.5">
-                                        <span className="font-bold text-slate-800">
-                                          {member?.name || idKey.split('_')[0]}
-                                        </span>
-                                        <span className="font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
-                                          {member?.code || idKey.split('_')[1]}
-                                        </span>
+                                      <div>
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="font-bold text-slate-800">
+                                            {member?.name || idKey.split('_')[0]}
+                                          </span>
+                                          <span className="font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                            {member?.code || idKey.split('_')[1]}
+                                          </span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">
+                                          {member?.part || '포장 · 주간조'}
+                                        </p>
                                       </div>
-                                      <p className="text-[10px] text-slate-400 mt-0.5">
-                                        {member?.part || '포장 · 주간조'}
-                                      </p>
                                     </div>
+                                    <span className={`font-bold px-2 py-1 rounded-lg text-[10px] ${
+                                      isPossible
+                                        ? 'bg-emerald-100 text-emerald-700'
+                                        : 'bg-rose-100 text-rose-700'
+                                    }`}>
+                                      {isPossible ? '출근 가능' : '출근 어려움'}
+                                    </span>
                                   </div>
-                                  <span className="bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded-lg text-[10px]">
-                                    출근 가능
-                                  </span>
-                                </div>
-                              );
-                            })
+                                );
+                              })
+                            )
                           )}
                         </div>
                       </section>
