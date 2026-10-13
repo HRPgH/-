@@ -147,6 +147,40 @@ export default function Home() {
   const [availabilityRecords, setAvailabilityRecords] = useState<AvailabilityItem[]>([]);
   const [isSavingAvailability, setIsSavingAvailability] = useState<boolean>(false);
   const availabilityFetchInProgress = useRef(false);
+  const availabilitySwipeStart = useRef<{ x: number; y: number } | null>(null);
+
+  const handleAvailabilitySwipeStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (
+      event.touches.length !== 1 ||
+      (event.target instanceof HTMLElement && event.target.closest('button, input, select, textarea'))
+    ) {
+      availabilitySwipeStart.current = null;
+      return;
+    }
+    const touch = event.touches[0];
+    availabilitySwipeStart.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleAvailabilitySwipeEnd = (event: React.TouchEvent<HTMLDivElement>) => {
+    const start = availabilitySwipeStart.current;
+    availabilitySwipeStart.current = null;
+    if (!start || selectedAvailabilityDate === 'all' || event.changedTouches.length !== 1) return;
+
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    if (Math.abs(deltaX) < 60 || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return;
+
+    const [year, month, day] = selectedAvailabilityDate.split('-').map(Number);
+    const nextDate = new Date(year, month - 1, day + (deltaX < 0 ? -1 : 1));
+    const nextDateKey = [
+      nextDate.getFullYear(),
+      String(nextDate.getMonth() + 1).padStart(2, '0'),
+      String(nextDate.getDate()).padStart(2, '0'),
+    ].join('-');
+    setSelectedAvailabilityDate(nextDateKey);
+    setSelectedConfirmedMembers({});
+  };
 
   const [userName, setUserName] = useState<string>('');
   const [userCode, setUserCode] = useState<string>('');
@@ -254,8 +288,9 @@ export default function Home() {
     Object.values(memberDb).forEach((member) => {
       if (member.scheduledWorkDate) dates.add(member.scheduledWorkDate);
     });
+    if (selectedAvailabilityDate !== 'all') dates.add(selectedAvailabilityDate);
     return Array.from(dates).sort((a, b) => b.localeCompare(a));
-  }, [availabilityRecords, memberDb]);
+  }, [availabilityRecords, memberDb, selectedAvailabilityDate]);
   const scheduledRosterDates = availabilityByDate.filter(({ scheduled }) => scheduled.length > 0);
   const scheduledRosterCount = scheduledRosterDates.reduce((count, { scheduled }) => count + scheduled.length, 0);
   const scheduledRosterMemberKeys = scheduledRosterDates.flatMap(({ scheduled }) => scheduled);
@@ -1929,7 +1964,11 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-xl">
+            <div
+              className="bg-slate-900 text-white p-5 rounded-2xl shadow-xl"
+              onTouchStart={handleAvailabilitySwipeStart}
+              onTouchEnd={handleAvailabilitySwipeEnd}
+            >
               <p className="text-xs text-slate-400 font-medium mb-1">다음 근무 · {workDateString}</p>
               <div className="flex items-center justify-between gap-2 mb-3">
                 <label htmlFor="availability-response-date" className="text-xs font-bold text-slate-300 shrink-0">
@@ -1970,6 +2009,11 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+              {selectedAvailabilityDate !== 'all' && (
+                <p className="-mt-1 mb-3 text-center text-[10px] text-slate-400">
+                  왼쪽으로 밀면 이전 날짜 · 오른쪽으로 밀면 다음 날짜
+                </p>
+              )}
               {selectedAvailabilityDate === 'all' ? (
                 <div className="space-y-3 pr-1">
                   <button
