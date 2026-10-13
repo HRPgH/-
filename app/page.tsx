@@ -38,6 +38,10 @@ function getAvailabilityDateKey(date = new Date()) {
   }).format(date);
 }
 
+function getConfirmedSelectionKey(date: string, workerKey: string) {
+  return `${date}::${workerKey}`;
+}
+
 function formatDateLabel(dateKey: string) {
   return new Date(`${dateKey}T00:00:00`).toLocaleDateString('ko-KR', {
     year: 'numeric',
@@ -970,15 +974,33 @@ export default function Home() {
     setSelectedConfirmedMembers((prev) => {
       const updated = { ...prev };
       confirmedList.forEach((idKey) => {
-        if (shouldSelectAll) updated[idKey] = true;
-        else delete updated[idKey];
+        const selectionKey = getConfirmedSelectionKey(selectedAvailabilityDate, idKey);
+        if (shouldSelectAll) updated[selectionKey] = true;
+        else delete updated[selectionKey];
       });
       return updated;
     });
   };
 
-  const handleDownloadSelectedConfirmed = () => {
-    const selectedKeys = confirmedList.filter((idKey) => selectedConfirmedMembers[idKey]);
+  const toggleSelectAllConfirmedForDate = (date: string, memberKeys: string[]) => {
+    const shouldSelectAll = !memberKeys.every(
+      (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
+    );
+    setSelectedConfirmedMembers((prev) => {
+      const updated = { ...prev };
+      memberKeys.forEach((idKey) => {
+        const selectionKey = getConfirmedSelectionKey(date, idKey);
+        if (shouldSelectAll) updated[selectionKey] = true;
+        else delete updated[selectionKey];
+      });
+      return updated;
+    });
+  };
+
+  const handleDownloadSelectedConfirmed = (date = selectedAvailabilityDate, memberKeys = confirmedList) => {
+    const selectedKeys = memberKeys.filter(
+      (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
+    );
     if (selectedKeys.length === 0) {
       alert('엑셀로 다운로드할 출근 확정 인원을 선택해 주세요.');
       return;
@@ -987,7 +1009,7 @@ export default function Home() {
     const exportRows = selectedKeys.map((idKey) => {
       const member = memberDb[idKey];
       return {
-        응답일: selectedAvailabilityDate,
+        응답일: date,
         성명: member?.name || idKey.split('_')[0],
         코드: member?.code || idKey.split('_')[1] || '',
         근무파트: member?.part || '포장 · 주간조',
@@ -1005,7 +1027,7 @@ export default function Home() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, '출근 확정 명단');
 
-    XLSX.writeFile(workbook, `출근_응답명단_${selectedAvailabilityDate.replace(/-/g, '')}.xlsx`);
+    XLSX.writeFile(workbook, `출근_응답명단_${date.replace(/-/g, '')}.xlsx`);
   };
 
   const handleDeleteSelected = async () => {
@@ -1192,7 +1214,9 @@ export default function Home() {
 
   const confirmedList = allKeys.filter(idKey => workerResponses[idKey] === 'possible');
   const confirmedCount = confirmedList.length;
-  const selectedConfirmedCount = confirmedList.filter(idKey => selectedConfirmedMembers[idKey]).length;
+  const selectedConfirmedCount = confirmedList.filter(
+    (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(selectedAvailabilityDate, idKey)]
+  ).length;
   const isAllConfirmedSelected = confirmedList.length > 0 && selectedConfirmedCount === confirmedList.length;
   const targetTotal = allKeys.length;
   const pendingCount = allKeys.filter(idKey => !workerResponses[idKey] || workerResponses[idKey] === 'none').length;
@@ -1704,36 +1728,119 @@ export default function Home() {
                 </select>
               </div>
               {selectedAvailabilityDate === 'all' ? (
-                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                  {availabilityByDate.map(({ date, possible, impossible }) => (
-                    <div key={date} className="bg-slate-800 border border-slate-700 rounded-xl p-3">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <h2 className="text-sm font-black">{formatDateLabel(date)}</h2>
-                        <button
-                          onClick={() => setSelectedAvailabilityDate(date)}
-                          className="text-[10px] font-bold text-blue-300 hover:text-white"
-                        >
-                          자세히 보기
-                        </button>
-                      </div>
-                      <p className="text-[11px] text-slate-300 mb-2">
-                        출근 가능 {possible.length}명 · 출근 불가 {impossible.length}명 · 미응답 {Math.max(targetTotal - possible.length - impossible.length, 0)}명
-                      </p>
-                      {possible.length > 0 && (
-                        <p className="text-[10px] leading-relaxed text-emerald-300">
-                          가능: {possible.map((workerKey) => memberDb[workerKey]?.name || workerKey.split('_')[0]).join(', ')}
-                        </p>
-                      )}
-                      {impossible.length > 0 && (
-                        <p className="text-[10px] leading-relaxed text-rose-300 mt-1">
-                          불가: {impossible.map((workerKey) => memberDb[workerKey]?.name || workerKey.split('_')[0]).join(', ')}
-                        </p>
-                      )}
-                      {possible.length === 0 && impossible.length === 0 && (
-                        <p className="text-[10px] text-slate-400">아직 응답이 없습니다.</p>
-                      )}
-                    </div>
-                  ))}
+                <div className="space-y-2 pr-1">
+                  {availabilityByDate.map(({ date, possible }) => {
+                    const dateSelectionCount = possible.filter(
+                      (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
+                    ).length;
+                    const isDateAllSelected = possible.length > 0 && dateSelectionCount === possible.length;
+
+                    return (
+                      <section key={date} className="bg-slate-900 border border-slate-700 rounded-2xl p-3.5">
+                        <div className="flex items-center gap-2 border-b border-slate-700 pb-2.5">
+                          <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <h2 className="min-w-0 flex-1 text-xs font-black text-white">
+                            출근 응답 명단 · {formatDateLabel(date)} ({possible.length}명)
+                          </h2>
+                        </div>
+
+                        {possible.length > 0 && (
+                          <div className="py-2.5 space-y-2">
+                            <button
+                              onClick={() => toggleSelectAllConfirmedForDate(date, possible)}
+                              className="flex items-center gap-1.5 text-[11px] font-bold text-slate-300"
+                            >
+                              {isDateAllSelected ? (
+                                <CheckSquare className="w-4 h-4 text-blue-400" />
+                              ) : (
+                                <Square className="w-4 h-4 text-slate-400" />
+                              )}
+                              전체 선택 ({dateSelectionCount}/{possible.length})
+                            </button>
+                            {dateSelectionCount > 0 && (
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  onClick={() => {
+                                    setGroupMessageRecipientKeys(
+                                      possible.filter(
+                                        (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
+                                      )
+                                    );
+                                    setShowGroupMsgModal(true);
+                                  }}
+                                  className="justify-center bg-blue-600 hover:bg-blue-500 text-white font-bold px-2 py-2 rounded-lg text-[10px] flex items-center gap-1 transition"
+                                >
+                                  <Send className="w-3.5 h-3.5" /> 메시지 ({dateSelectionCount})
+                                </button>
+                                <button
+                                  onClick={() => handleDownloadSelectedConfirmed(date, possible)}
+                                  className="justify-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2 py-2 rounded-lg text-[10px] flex items-center gap-1 transition"
+                                >
+                                  <Download className="w-3.5 h-3.5" /> 엑셀 다운로드
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="space-y-2">
+                          {possible.length === 0 ? (
+                            <p className="py-5 text-center text-[11px] text-slate-400">
+                              해당 날짜에 출근 가능 응답자가 없습니다.
+                            </p>
+                          ) : (
+                            possible.map((idKey) => {
+                              const member = memberDb[idKey];
+                              const selectionKey = getConfirmedSelectionKey(date, idKey);
+                              const isSelected = !!selectedConfirmedMembers[selectionKey];
+
+                              return (
+                                <div
+                                  key={idKey}
+                                  className="bg-slate-50 border border-slate-200 p-3 rounded-2xl flex justify-between items-center text-xs"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() =>
+                                        setSelectedConfirmedMembers((prev) => ({
+                                          ...prev,
+                                          [selectionKey]: !prev[selectionKey],
+                                        }))
+                                      }
+                                      className="text-slate-400"
+                                      aria-label={`${member?.name || idKey.split('_')[0]} 선택`}
+                                    >
+                                      {isSelected ? (
+                                        <CheckSquare className="w-4 h-4 text-blue-600" />
+                                      ) : (
+                                        <Square className="w-4 h-4 text-slate-300" />
+                                      )}
+                                    </button>
+                                    <div>
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="font-bold text-slate-800">
+                                          {member?.name || idKey.split('_')[0]}
+                                        </span>
+                                        <span className="font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                          {member?.code || idKey.split('_')[1]}
+                                        </span>
+                                      </div>
+                                      <p className="text-[10px] text-slate-400 mt-0.5">
+                                        {member?.part || '포장 · 주간조'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <span className="bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded-lg text-[10px]">
+                                    출근 가능
+                                  </span>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      </section>
+                    );
+                  })}
                 </div>
               ) : (
                 <>
@@ -2304,7 +2411,10 @@ export default function Home() {
                         <button
                           onClick={() => {
                             setGroupMessageRecipientKeys(
-                              confirmedList.filter((idKey) => selectedConfirmedMembers[idKey])
+                              confirmedList.filter(
+                                (idKey) =>
+                                  selectedConfirmedMembers[getConfirmedSelectionKey(selectedAvailabilityDate, idKey)]
+                              )
                             );
                             setShowGroupMsgModal(true);
                           }}
@@ -2313,7 +2423,7 @@ export default function Home() {
                           <Send className="w-3.5 h-3.5" /> 선택 인원에게 메시지 ({selectedConfirmedCount})
                         </button>
                         <button
-                          onClick={handleDownloadSelectedConfirmed}
+                          onClick={() => handleDownloadSelectedConfirmed()}
                           className="justify-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2 py-2 rounded-lg text-[11px] flex items-center gap-1 transition shadow-sm"
                         >
                           <Download className="w-3.5 h-3.5" /> 엑셀 다운로드 ({selectedConfirmedCount})
@@ -2329,15 +2439,21 @@ export default function Home() {
                 ) : (
                   confirmedList.map((idKey) => {
                     const member = memberDb[idKey];
+                    const selectionKey = getConfirmedSelectionKey(selectedAvailabilityDate, idKey);
                     return (
                       <div key={idKey} className="bg-slate-50 border border-slate-200 p-3 rounded-2xl flex justify-between items-center text-xs">
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => setSelectedConfirmedMembers((prev) => ({ ...prev, [idKey]: !prev[idKey] }))}
+                            onClick={() =>
+                              setSelectedConfirmedMembers((prev) => ({
+                                ...prev,
+                                [selectionKey]: !prev[selectionKey],
+                              }))
+                            }
                             className="text-slate-400"
                             aria-label={`${member?.name || idKey.split('_')[0]} 선택`}
                           >
-                            {selectedConfirmedMembers[idKey] ? (
+                            {selectedConfirmedMembers[selectionKey] ? (
                               <CheckSquare className="w-4 h-4 text-blue-600" />
                             ) : (
                               <Square className="w-4 h-4 text-slate-300" />
