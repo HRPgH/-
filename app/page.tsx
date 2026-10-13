@@ -2070,17 +2070,28 @@ export default function Home() {
 
             <div
               className={`bg-slate-900 text-white p-5 rounded-2xl shadow-xl ${
-                isAdminPcView ? 'lg:col-start-1 lg:row-start-3 lg:flex lg:min-h-0 lg:flex-col lg:justify-between lg:gap-6' : ''
+                isAdminPcView ? 'lg:col-start-1 lg:row-start-3 lg:flex lg:min-h-0 lg:flex-col lg:overflow-y-auto' : ''
               }`}
               onTouchStart={handleAvailabilitySwipeStart}
               onTouchEnd={handleAvailabilitySwipeEnd}
             >
-              <p className="text-xs text-slate-400 font-medium mb-1">다음 근무 · {workDateString}</p>
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <label htmlFor="availability-response-date" className="text-xs font-bold text-slate-300 shrink-0">
+              <p className={`text-xs text-slate-400 font-medium ${
+                isAdminPcView ? 'mb-3 rounded-lg bg-slate-800/70 px-3 py-2' : 'mb-1'
+              }`}>다음 근무 · {workDateString}</p>
+              <div className={`${
+                isAdminPcView ? 'mb-5 space-y-2.5' : 'flex items-center justify-between gap-2 mb-3'
+              }`}>
+                <label
+                  htmlFor="availability-response-date"
+                  className={`text-xs font-bold text-slate-300 ${
+                    isAdminPcView ? 'block' : 'shrink-0'
+                  }`}
+                >
                   응답 누른 날짜
                 </label>
-                <div className="flex min-w-0 flex-col items-end gap-1.5">
+                <div className={`flex min-w-0 flex-col gap-1.5 ${
+                  isAdminPcView ? 'items-stretch' : 'items-end'
+                }`}>
                   <button
                     type="button"
                     onClick={() => setShowScheduledRosterModal(true)}
@@ -2088,7 +2099,7 @@ export default function Home() {
                   >
                     출근 예정 명단 확인 ({scheduledRosterCount}명)
                   </button>
-                  <div className="flex min-w-0 items-center gap-1.5">
+                  <div className="flex w-full min-w-0 items-center gap-1.5">
                     <select
                       id="availability-response-date"
                       value={selectedAvailabilityDate}
@@ -2096,7 +2107,7 @@ export default function Home() {
                         setSelectedAvailabilityDate(event.target.value);
                         setSelectedConfirmedMembers({});
                       }}
-                      className="min-w-0 bg-slate-800 border border-slate-700 text-white text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400"
+                      className="min-w-0 flex-1 bg-slate-800 border border-slate-700 text-white text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none focus:border-blue-400"
                     >
                       <option value="all">전체 보기</option>
                       {availabilityDates.map((date) => (
@@ -2306,21 +2317,57 @@ export default function Home() {
                   )}
                 </div>
               ) : (
-                <>
-                  <h2 className="text-2xl font-black mb-1">출근 가능 {confirmedCount}명</h2>
-                  <p className="text-xs text-slate-400 mb-4">선택한 응답 날짜 기준 · 전체 명단 {targetTotal}명 · 미응답 {pendingCount}명</p>
+                <div className={isAdminPcView ? 'flex min-h-0 flex-1 flex-col' : ''}>
+                  <div>
+                    <h2 className={`${isAdminPcView ? 'text-xl' : 'text-2xl'} font-black mb-2`}>
+                      출근 가능 <span className="text-blue-300">{confirmedCount}명</span>
+                    </h2>
+                    {isAdminPcView ? (
+                      <div className="grid grid-cols-2 gap-2 mb-4">
+                        <div className="rounded-xl border border-slate-700 bg-slate-800/80 px-3 py-2">
+                          <p className="text-[10px] font-medium text-slate-400">전체 명단</p>
+                          <p className="mt-0.5 text-sm font-bold text-white">{targetTotal}명</p>
+                        </div>
+                        <div className="rounded-xl border border-slate-700 bg-slate-800/80 px-3 py-2">
+                          <p className="text-[10px] font-medium text-slate-400">미응답</p>
+                          <p className="mt-0.5 text-sm font-bold text-white">{pendingCount}명</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 mb-4">
+                        선택한 응답 날짜 기준 · 전체 명단 {targetTotal}명 · 미응답 {pendingCount}명
+                      </p>
+                    )}
 
-                  <div className="w-full bg-slate-800 h-2 rounded-full mb-5 overflow-hidden">
-                    <div
-                      className="bg-blue-500 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${targetTotal > 0 ? Math.min((confirmedCount / targetTotal) * 100, 100) : 0}%` }}
-                    ></div>
+                    <div className={`w-full bg-slate-800 h-2 rounded-full overflow-hidden ${
+                      isAdminPcView ? 'mb-4' : 'mb-5'
+                    }`}>
+                      <div
+                        className="bg-blue-500 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${targetTotal > 0 ? Math.min((confirmedCount / targetTotal) * 100, 100) : 0}%` }}
+                      ></div>
+                    </div>
+                    {Object.entries(memberDb).some(([, member]) => member.scheduledWorkDate === selectedAvailabilityDate) && (
+                      <div className="mb-4 rounded-xl border border-blue-400/30 bg-blue-500/10 p-3">
+                        <p className="text-xs font-bold text-blue-200 mb-1">
+                          출근 예정 · {Object.entries(memberDb).filter(([, member]) => member.scheduledWorkDate === selectedAvailabilityDate).length}명
+                        </p>
+                        <p className="text-[11px] leading-relaxed text-blue-100">
+                          {Object.entries(memberDb)
+                            .filter(([, member]) => member.scheduledWorkDate === selectedAvailabilityDate)
+                            .map(([, member]) => `${member.name} (${member.code})`)
+                            .join(', ')}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className={`grid grid-cols-2 gap-2 ${
+                    isAdminPcView ? 'mt-auto pt-5' : ''
+                  }`}>
                     <button
                       onClick={() => setShowConfirmedModal(true)}
-                      className="flex flex-col items-center justify-center gap-0.5 bg-blue-600 hover:bg-blue-500 py-2.5 rounded-xl font-bold text-xs leading-tight text-white transition shadow-lg shadow-blue-900/50"
+                      className="flex flex-col items-center justify-center gap-0.5 bg-blue-600 hover:bg-blue-500 py-2.5 rounded-xl font-bold text-xs leading-tight text-white transition shadow-lg shadow-blue-900/50 text-center"
                     >
                       <span>출근 명단 확인</span>
                       <span className="text-[10px]">
@@ -2340,20 +2387,7 @@ export default function Home() {
                       엑셀 다운로드
                     </button>
                   </div>
-                  {Object.entries(memberDb).some(([, member]) => member.scheduledWorkDate === selectedAvailabilityDate) && (
-                    <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 p-3">
-                      <p className="text-xs font-bold text-blue-800 mb-1">
-                        출근 예정 · {Object.entries(memberDb).filter(([, member]) => member.scheduledWorkDate === selectedAvailabilityDate).length}명
-                      </p>
-                      <p className="text-[11px] leading-relaxed text-blue-700">
-                        {Object.entries(memberDb)
-                          .filter(([, member]) => member.scheduledWorkDate === selectedAvailabilityDate)
-                          .map(([, member]) => `${member.name} (${member.code})`)
-                          .join(', ')}
-                      </p>
-                    </div>
-                  )}
-                </>
+                </div>
               )}
             </div>
 
