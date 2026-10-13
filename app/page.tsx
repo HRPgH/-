@@ -110,6 +110,7 @@ export default function Home() {
 
   const [selectedMembers, setSelectedMembers] = useState<{ [idKey: string]: boolean }>({});
   const [scheduledWorkDateInput, setScheduledWorkDateInput] = useState(() => getAvailabilityDateKey());
+  const [isSavingScheduledWorkDate, setIsSavingScheduledWorkDate] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showAddMemberModal, setShowAddMemberModal] = useState<boolean>(false);
@@ -1164,6 +1165,7 @@ export default function Home() {
   };
 
   const saveSelectedScheduledWorkDate = async (scheduledWorkDate: string | null) => {
+    if (isSavingScheduledWorkDate) return;
     if (!supabase) {
       alert('DB 연결에 실패하여 출근 예정일을 저장할 수 없습니다.');
       return;
@@ -1183,29 +1185,36 @@ export default function Home() {
 
     const failures: string[] = [];
     let updatedCount = 0;
-    for (const idKey of selectedKeys) {
-      const member = memberDb[idKey];
-      if (!member) continue;
-      const { error } = await supabase
-        .from('members')
-        .update({ scheduled_work_date: scheduledWorkDate })
-        .match({ name: member.name, code: member.code });
+    setIsSavingScheduledWorkDate(true);
+    try {
+      for (const idKey of selectedKeys) {
+        const member = memberDb[idKey];
+        if (!member) continue;
+        const { data, error } = await supabase
+          .from('members')
+          .update({ scheduled_work_date: scheduledWorkDate })
+          .match({ name: member.name, code: member.code })
+          .select('name, code');
 
-      if (error) failures.push(`${member.name}: ${error.message}`);
-      else updatedCount++;
+        if (error) failures.push(`${member.name}: ${error.message}`);
+        else if (data?.length === 1) updatedCount++;
+        else failures.push(`${member.name}: 변경된 행을 확인하지 못했습니다. 권한 또는 명단을 확인해 주세요.`);
+      }
+
+      if (updatedCount > 0) await fetchMembers();
+      if (failures.length > 0) {
+        alert(
+          `${updatedCount}명 저장, ${failures.length}명 실패했습니다.\n${failures.slice(0, 3).join('\n')}${failures.length > 3 ? '\n외 추가 오류가 있습니다.' : ''}\nSupabase에 scheduled_work_date 컬럼이 없으면 README의 DB 설정 절차를 먼저 완료해 주세요.`
+        );
+        return;
+      }
+
+      alert(scheduledWorkDate
+        ? `${updatedCount}명의 출근 예정일을 ${formatDateLabel(scheduledWorkDate)}로 저장했습니다.`
+        : `${updatedCount}명의 출근 예정일을 해제했습니다.`);
+    } finally {
+      setIsSavingScheduledWorkDate(false);
     }
-
-    if (updatedCount > 0) await fetchMembers();
-    if (failures.length > 0) {
-      alert(
-        `${updatedCount}명 저장, ${failures.length}명 실패했습니다.\n${failures.slice(0, 3).join('\n')}${failures.length > 3 ? '\n외 추가 오류가 있습니다.' : ''}\nSupabase에 scheduled_work_date 컬럼이 없으면 README의 DB 설정 절차를 먼저 완료해 주세요.`
-      );
-      return;
-    }
-
-    alert(scheduledWorkDate
-      ? `${updatedCount}명의 출근 예정일을 ${formatDateLabel(scheduledWorkDate)}로 저장했습니다.`
-      : `${updatedCount}명의 출근 예정일을 해제했습니다.`);
   };
 
   const handleResponse = async (status: 'possible' | 'impossible') => {
@@ -2385,14 +2394,16 @@ export default function Home() {
                   <button
                     type="button"
                     onClick={() => saveSelectedScheduledWorkDate(scheduledWorkDateInput)}
-                    className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-blue-500"
+                    disabled={isSavingScheduledWorkDate}
+                    className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60"
                   >
-                    예정일 저장
+                    {isSavingScheduledWorkDate ? '저장 중...' : '예정일 저장'}
                   </button>
                   <button
                     type="button"
                     onClick={() => saveSelectedScheduledWorkDate(null)}
-                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 transition hover:bg-slate-100"
+                    disabled={isSavingScheduledWorkDate}
+                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
                   >
                     예정 해제
                   </button>
