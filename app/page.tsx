@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Bus, Bell, Key, User, ShieldCheck, AlertTriangle, BookOpen, Info, Plus, Trash2, Users, Send, MessageSquare, X, Megaphone, CheckCircle, CalendarDays, FileSpreadsheet, CheckSquare, Square, UserCog, Bot, Phone, FileText, Check, Search, UserMinus, UserCheck, LogOut, ChevronRight, Clock, Download, Smartphone } from 'lucide-react';
+import { Bus, Bell, Key, User, ShieldCheck, AlertTriangle, BookOpen, Info, Plus, Trash2, Users, Send, MessageSquare, X, Megaphone, CheckCircle, CalendarDays, FileSpreadsheet, CheckSquare, Square, UserCog, Bot, Phone, FileText, Check, Search, UserMinus, UserCheck, LogOut, ChevronLeft, ChevronRight, Clock, Download, Smartphone } from 'lucide-react';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 
@@ -149,6 +149,19 @@ export default function Home() {
   const availabilityFetchInProgress = useRef(false);
   const availabilitySwipeStart = useRef<{ x: number; y: number } | null>(null);
 
+  const shiftAvailabilityDate = (dayOffset: -1 | 1) => {
+    if (selectedAvailabilityDate === 'all') return;
+    const [year, month, day] = selectedAvailabilityDate.split('-').map(Number);
+    const nextDate = new Date(year, month - 1, day + dayOffset);
+    const nextDateKey = [
+      nextDate.getFullYear(),
+      String(nextDate.getMonth() + 1).padStart(2, '0'),
+      String(nextDate.getDate()).padStart(2, '0'),
+    ].join('-');
+    setSelectedAvailabilityDate(nextDateKey);
+    setSelectedConfirmedMembers({});
+  };
+
   const handleAvailabilitySwipeStart = (event: React.TouchEvent<HTMLDivElement>) => {
     if (
       event.touches.length !== 1 ||
@@ -171,15 +184,7 @@ export default function Home() {
     const deltaY = touch.clientY - start.y;
     if (Math.abs(deltaX) < 60 || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) return;
 
-    const [year, month, day] = selectedAvailabilityDate.split('-').map(Number);
-    const nextDate = new Date(year, month - 1, day + (deltaX < 0 ? -1 : 1));
-    const nextDateKey = [
-      nextDate.getFullYear(),
-      String(nextDate.getMonth() + 1).padStart(2, '0'),
-      String(nextDate.getDate()).padStart(2, '0'),
-    ].join('-');
-    setSelectedAvailabilityDate(nextDateKey);
-    setSelectedConfirmedMembers({});
+    shiftAvailabilityDate(deltaX > 0 ? -1 : 1);
   };
 
   const [userName, setUserName] = useState<string>('');
@@ -2009,11 +2014,6 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-              {selectedAvailabilityDate !== 'all' && (
-                <p className="-mt-1 mb-3 text-center text-[10px] text-slate-400">
-                  왼쪽으로 밀면 이전 날짜 · 오른쪽으로 밀면 다음 날짜
-                </p>
-              )}
               {selectedAvailabilityDate === 'all' ? (
                 <div className="space-y-3 pr-1">
                   <button
@@ -2946,9 +2946,32 @@ export default function Home() {
               onTouchEnd={handleAvailabilitySwipeEnd}
             >
               <div className="flex justify-between items-center border-b pb-3">
-                <h3 className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                  <CheckCircle className="w-4 h-4 text-emerald-600" /> 출근 응답 명단 · {formatDateLabel(selectedAvailabilityDate)} ({confirmedCount}명)
-                </h3>
+                <div className="flex min-w-0 items-center gap-1">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <button
+                    type="button"
+                    onClick={() => shiftAvailabilityDate(-1)}
+                    disabled={selectedAvailabilityDate === 'all'}
+                    className="rounded-lg p-1 text-slate-500 transition hover:bg-slate-100 hover:text-blue-600 disabled:opacity-40"
+                    aria-label="이전 날짜"
+                    title="이전 날짜"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  <h3 className="min-w-0 text-center font-bold text-slate-900 text-xs sm:text-sm">
+                    출근 응답 명단 · {formatDateLabel(selectedAvailabilityDate)} ({confirmedCount}명)
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => shiftAvailabilityDate(1)}
+                    disabled={selectedAvailabilityDate === 'all'}
+                    className="rounded-lg p-1 text-slate-500 transition hover:bg-slate-100 hover:text-blue-600 disabled:opacity-40"
+                    aria-label="다음 날짜"
+                    title="다음 날짜"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
                 <button onClick={() => setShowConfirmedModal(false)} className="text-slate-400 text-sm font-bold">
                   ✕
                 </button>
