@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Bus, Bell, Key, User, ShieldCheck, AlertTriangle, BookOpen, Info, Plus, Trash2, Users, Send, MessageSquare, X, Megaphone, CheckCircle, CalendarDays, FileSpreadsheet, CheckSquare, Square, UserCog, Bot, Phone, FileText, Check, Search, UserMinus, UserCheck, LogOut, ChevronLeft, ChevronRight, Clock, Download, Smartphone } from 'lucide-react';
+import { Bus, Bell, Key, User, ShieldCheck, AlertTriangle, BookOpen, Info, Plus, Trash2, Users, Send, MessageSquare, X, Megaphone, CheckCircle, CalendarDays, FileSpreadsheet, CheckSquare, Square, UserCog, Bot, Phone, FileText, Check, Search, UserMinus, UserCheck, LogOut, ChevronLeft, ChevronRight, Clock, Download, Smartphone, Monitor } from 'lucide-react';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import * as XLSX from 'xlsx';
 
@@ -104,6 +104,7 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [role, setRole] = useState<'worker' | 'admin'>('worker');
   const [adminViewTab, setAdminViewTab] = useState<'worker' | 'admin'>('admin');
+  const [isAdminPcView, setIsAdminPcView] = useState<boolean>(false);
 
   const GOOGLE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSfZdBbWY7B26JVyus9qlmglVFNh-oZ791GCFU9MJ0-5wu28tw/viewform?usp=dialog";
 
@@ -1555,12 +1556,19 @@ export default function Home() {
   const activeViewMode = role === 'admin' ? adminViewTab : 'worker';
 
   return (
-    <div className="fixed inset-0 z-0 flex h-[100dvh] flex-col overflow-hidden bg-slate-100 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] font-sans text-slate-800 sm:static sm:h-auto sm:min-h-screen sm:overflow-visible sm:px-4 sm:py-8">
+    <div className={`fixed inset-0 z-0 flex h-[100dvh] flex-col overflow-hidden bg-slate-100 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] font-sans text-slate-800 sm:static sm:h-auto sm:min-h-screen sm:overflow-visible sm:px-4 sm:py-8 ${
+      isAdminPcView ? 'lg:px-8 lg:py-6' : ''
+    }`}>
       {isLoggedIn && role === 'admin' && (
-        <div className="max-w-md mx-auto mb-2 sm:mb-4 flex justify-end items-center text-xs shrink-0">
-          <div className="flex gap-2">
+        <div className={`mx-auto mb-2 sm:mb-4 flex items-center text-xs shrink-0 ${
+          isAdminPcView ? 'w-full max-w-[1600px] justify-end' : 'max-w-md justify-end'
+        }`}>
+          <div className="flex flex-wrap justify-end gap-2">
             <button
-              onClick={() => setAdminViewTab('worker')}
+              onClick={() => {
+                setIsAdminPcView(false);
+                setAdminViewTab('worker');
+              }}
               className={`px-3 py-1.5 rounded-full font-bold transition ${
                 adminViewTab === 'worker' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
               }`}
@@ -1568,9 +1576,12 @@ export default function Home() {
               지원자 화면 보기
             </button>
             <button
-              onClick={() => setAdminViewTab('admin')}
+              onClick={() => {
+                setIsAdminPcView(false);
+                setAdminViewTab('admin');
+              }}
               className={`px-3 py-1.5 rounded-full font-bold transition relative ${
-                adminViewTab === 'admin' ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
+                adminViewTab === 'admin' && !isAdminPcView ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'
               }`}
             >
               관리자 화면 보기
@@ -1580,12 +1591,31 @@ export default function Home() {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => {
+                setAdminViewTab('admin');
+                setIsAdminPcView(true);
+              }}
+              aria-pressed={isAdminPcView}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold transition ${
+                isAdminPcView ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200'
+              }`}
+            >
+              <Monitor className="h-3.5 w-3.5" />
+              관리자 화면보기(PC)
+            </button>
           </div>
         </div>
       )}
 
-      <div className="w-full max-w-md mx-auto bg-slate-50 h-full min-h-0 flex-1 sm:flex-none sm:h-auto sm:min-h-[780px] sm:rounded-[3rem] sm:border-[8px] sm:border-slate-900 sm:shadow-2xl overflow-y-auto overscroll-contain touch-pan-y relative p-4 sm:p-5">
-        <div className="hidden sm:block w-32 h-4 bg-slate-900 mx-auto rounded-b-xl mb-4"></div>
+      <div className={`w-full mx-auto bg-slate-50 h-full min-h-0 flex-1 sm:flex-none sm:h-auto sm:min-h-[780px] overflow-y-auto overscroll-contain touch-pan-y relative p-4 ${
+        isAdminPcView
+          ? 'max-w-md sm:max-w-none sm:rounded-2xl sm:border sm:border-slate-200 sm:shadow-xl sm:p-6 lg:max-w-[1600px] lg:min-h-[calc(100vh-8rem)] lg:rounded-3xl lg:p-8'
+          : 'max-w-md sm:rounded-[3rem] sm:border-[8px] sm:border-slate-900 sm:shadow-2xl sm:p-5'
+      }`}>
+        <div className={`hidden sm:block w-32 h-4 bg-slate-900 mx-auto rounded-b-xl mb-4 ${
+          isAdminPcView ? 'sm:hidden' : ''
+        }`}></div>
 
         {isLoggedIn && role === 'admin' && adminIncomingMessage && (
           <div className="absolute top-8 left-4 right-4 z-40 bg-white border border-blue-200 rounded-2xl shadow-xl p-3">
@@ -1953,11 +1983,13 @@ export default function Home() {
         )}
 
         {isLoggedIn && activeViewMode === 'admin' && (
-          <div className="space-y-5">
-            <div className="flex justify-between items-center">
+          <div className={isAdminPcView ? 'grid grid-cols-1 gap-5 lg:grid-cols-12' : 'space-y-5'}>
+            <div className={`flex justify-between items-center ${
+              isAdminPcView ? 'lg:col-span-12 rounded-2xl bg-white px-5 py-4 shadow-sm border border-slate-200/80' : ''
+            }`}>
               <div>
                 <span className="text-xs font-black tracking-wider text-blue-600">올품(아르바이트) 채용 도우미 관리자</span>
-                <h1 className="text-lg font-bold">{userName}님, 안녕하세요</h1>
+                <h1 className={isAdminPcView ? 'text-xl font-bold' : 'text-lg font-bold'}>{userName}님, 안녕하세요</h1>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -2037,7 +2069,9 @@ export default function Home() {
             </div>
 
             <div
-              className="bg-slate-900 text-white p-5 rounded-2xl shadow-xl"
+              className={`bg-slate-900 text-white p-5 rounded-2xl shadow-xl ${
+                isAdminPcView ? 'lg:col-span-5 lg:row-start-3' : ''
+              }`}
               onTouchStart={handleAvailabilitySwipeStart}
               onTouchEnd={handleAvailabilitySwipeEnd}
             >
@@ -2323,7 +2357,9 @@ export default function Home() {
               )}
             </div>
 
-            <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-2xl flex items-center justify-between gap-2">
+            <div className={`bg-amber-50 border border-amber-200/80 p-3.5 rounded-2xl flex items-center justify-between gap-2 ${
+              isAdminPcView ? 'lg:col-span-12' : ''
+            }`}>
               <div className="flex items-center gap-2">
                 <Megaphone className="w-4 h-4 text-amber-600 shrink-0" />
                 <div>
@@ -2347,7 +2383,9 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+            <div className={`bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3 ${
+              isAdminPcView ? 'lg:col-span-7 lg:row-start-3' : ''
+            }`}>
               <div className="flex justify-between items-center border-b pb-2.5">
                 <div className="flex items-center gap-1.5">
                   <Users className="w-4 h-4 text-blue-600" />
@@ -2527,7 +2565,9 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="divide-y divide-slate-100 max-h-56 overflow-y-auto">
+              <div className={`divide-y divide-slate-100 max-h-56 overflow-y-auto ${
+                isAdminPcView ? 'lg:max-h-[calc(100vh-22rem)]' : ''
+              }`}>
                 {visibleMemberKeys.length === 0 ? (
                   <div className="text-center py-8 text-slate-400 text-xs font-medium">
                     {memberSearchTerm
