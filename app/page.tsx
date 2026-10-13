@@ -1557,7 +1557,7 @@ export default function Home() {
 
   return (
     <div className={`fixed inset-0 z-0 flex h-[100dvh] flex-col overflow-hidden bg-slate-100 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] font-sans text-slate-800 sm:static sm:h-auto sm:min-h-screen sm:overflow-visible sm:px-4 sm:py-8 ${
-      isAdminPcView ? 'lg:px-8 lg:py-6' : ''
+      isAdminPcView ? 'lg:fixed lg:inset-0 lg:h-screen lg:min-h-0 lg:overflow-hidden lg:px-6 lg:py-2' : ''
     }`}>
       {isLoggedIn && role === 'admin' && (
         <div className={`mx-auto mb-2 sm:mb-4 flex items-center text-xs shrink-0 ${
@@ -1610,7 +1610,7 @@ export default function Home() {
 
       <div className={`w-full mx-auto bg-slate-50 h-full min-h-0 flex-1 sm:flex-none sm:h-auto sm:min-h-[780px] overflow-y-auto overscroll-contain touch-pan-y relative p-4 ${
         isAdminPcView
-          ? 'max-w-md sm:max-w-none sm:rounded-2xl sm:border sm:border-slate-200 sm:shadow-xl sm:p-6 lg:max-w-[1600px] lg:min-h-[calc(100vh-8rem)] lg:rounded-3xl lg:p-8'
+          ? 'max-w-md sm:max-w-none sm:rounded-2xl sm:border sm:border-slate-200 sm:shadow-xl sm:p-6 lg:flex-1 lg:h-full lg:min-h-0 lg:max-w-[1600px] lg:overflow-hidden lg:rounded-2xl lg:p-4'
           : 'max-w-md sm:rounded-[3rem] sm:border-[8px] sm:border-slate-900 sm:shadow-2xl sm:p-5'
       }`}>
         <div className={`hidden sm:block w-32 h-4 bg-slate-900 mx-auto rounded-b-xl mb-4 ${
@@ -1983,9 +1983,9 @@ export default function Home() {
         )}
 
         {isLoggedIn && activeViewMode === 'admin' && (
-          <div className={isAdminPcView ? 'grid grid-cols-1 items-start gap-5 lg:grid-cols-12' : 'space-y-5'}>
+          <div className={isAdminPcView ? 'grid grid-cols-1 items-start gap-5 lg:h-full lg:min-h-0 lg:grid-cols-12 lg:grid-rows-[auto_auto_minmax(0,1fr)] lg:gap-3' : 'space-y-5'}>
             <div className={`flex justify-between items-center ${
-              isAdminPcView ? 'lg:col-span-12 rounded-2xl bg-white px-5 py-4 shadow-sm border border-slate-200/80' : ''
+              isAdminPcView ? 'lg:col-span-12 rounded-2xl bg-white px-4 py-2.5 shadow-sm border border-slate-200/80' : ''
             }`}>
               <div>
                 <span className="text-xs font-black tracking-wider text-blue-600">올품(아르바이트) 채용 도우미 관리자</span>
@@ -2384,7 +2384,7 @@ export default function Home() {
             </div>
 
             <div className={`bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-3 ${
-              isAdminPcView ? 'lg:col-span-7 lg:row-start-3' : ''
+              isAdminPcView ? 'lg:col-span-7 lg:row-start-3 lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden' : ''
             }`}>
               <div className="flex justify-between items-center border-b pb-2.5">
                 <div className="flex items-center gap-1.5">
@@ -2566,7 +2566,7 @@ export default function Home() {
               </div>
 
               <div className={`divide-y divide-slate-100 max-h-56 overflow-y-auto ${
-                isAdminPcView ? 'lg:max-h-[calc(100vh-22rem)]' : ''
+                isAdminPcView ? 'lg:max-h-none lg:min-h-0 lg:flex-1' : ''
               }`}>
                 {visibleMemberKeys.length === 0 ? (
                   <div className="text-center py-8 text-slate-400 text-xs font-medium">
