@@ -1071,11 +1071,53 @@ export default function Home() {
     setIsSavingAvailability(true);
     try {
       const isClearingResponse = workerResponses[userUniqueKey] === status;
+      const todayDate = getAvailabilityDateKey();
+      const previousPossibleRecord = status === 'impossible'
+        ? availabilityRecords
+          .filter((record) => record.worker_name === userUniqueKey && record.status === 'possible')
+          .sort((recordA, recordB) => recordB.created_at.localeCompare(recordA.created_at))[0]
+        : undefined;
       let previousPossibleDate: string | null = null;
       let error;
 
-      if (isClearingResponse) {
-        const responseDateStart = new Date(`${getAvailabilityDateKey()}T00:00:00+09:00`);
+      if (status === 'impossible' && previousPossibleRecord) {
+        previousPossibleDate = getAvailabilityDateKey(new Date(previousPossibleRecord.created_at));
+        const previousDateStart = new Date(`${previousPossibleDate}T00:00:00+09:00`);
+        const previousDateEnd = new Date(previousDateStart);
+        previousDateEnd.setUTCDate(previousDateEnd.getUTCDate() + 1);
+        ({ error } = await supabase
+          .from('work_availabilities')
+          .update({ status: 'impossible' })
+          .eq('worker_name', userUniqueKey)
+          .eq('status', 'possible')
+          .gte('created_at', previousDateStart.toISOString())
+          .lt('created_at', previousDateEnd.toISOString()));
+
+        if (error) {
+          alert(`기존 출근 응답 변경에 실패했습니다: ${error.message}`);
+          return;
+        }
+
+        if (previousPossibleDate !== todayDate) {
+          const todayDateStart = new Date(`${todayDate}T00:00:00+09:00`);
+          const todayDateEnd = new Date(todayDateStart);
+          todayDateEnd.setUTCDate(todayDateEnd.getUTCDate() + 1);
+          const { error: duplicateCleanupError } = await supabase
+            .from('work_availabilities')
+            .delete()
+            .eq('worker_name', userUniqueKey)
+            .eq('status', 'impossible')
+            .gte('created_at', todayDateStart.toISOString())
+            .lt('created_at', todayDateEnd.toISOString());
+
+          if (duplicateCleanupError) {
+            alert(`기존 날짜 응답은 출근 어려움으로 변경했지만 오늘 날짜의 중복 응답을 정리하지 못했습니다: ${duplicateCleanupError.message}`);
+            await fetchCounts();
+            return;
+          }
+        }
+      } else if (isClearingResponse) {
+        const responseDateStart = new Date(`${todayDate}T00:00:00+09:00`);
         const responseDateEnd = new Date(responseDateStart);
         responseDateEnd.setUTCDate(responseDateEnd.getUTCDate() + 1);
         ({ error } = await supabase
@@ -1098,26 +1140,6 @@ export default function Home() {
             await fetchCounts();
             return;
           }
-        }
-      } else if (status === 'impossible') {
-        const previousPossibleRecord = availabilityRecords
-          .filter((record) => record.worker_name === userUniqueKey && record.status === 'possible')
-          .sort((recordA, recordB) => recordB.created_at.localeCompare(recordA.created_at))[0];
-
-        if (previousPossibleRecord) {
-          previousPossibleDate = getAvailabilityDateKey(new Date(previousPossibleRecord.created_at));
-          const responseDateStart = new Date(`${previousPossibleDate}T00:00:00+09:00`);
-          const responseDateEnd = new Date(responseDateStart);
-          responseDateEnd.setUTCDate(responseDateEnd.getUTCDate() + 1);
-          ({ error } = await supabase
-            .from('work_availabilities')
-            .update({ status: 'impossible' })
-            .eq('worker_name', userUniqueKey)
-            .eq('status', 'possible')
-            .gte('created_at', responseDateStart.toISOString())
-            .lt('created_at', responseDateEnd.toISOString()));
-        } else {
-          ({ error } = await supabase.from('work_availabilities').insert([{ worker_name: userUniqueKey, status }]));
         }
       } else {
         ({ error } = await supabase.from('work_availabilities').insert([{ worker_name: userUniqueKey, status }]));
