@@ -3033,9 +3033,16 @@ export default function Home() {
                           <p className="text-[10px] text-slate-400 mt-0.5">{member?.part || '포장 · 주간조'}</p>
                           </div>
                         </div>
-                        <span className="bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded-lg text-[10px]">
-                          출근 가능
-                        </span>
+                        <div className="flex flex-wrap items-center justify-end gap-1">
+                          {member?.scheduledWorkDate && (
+                            <span className="rounded-lg bg-blue-50 px-2 py-1 text-[10px] font-bold text-blue-700">
+                              {`${Number(member.scheduledWorkDate.slice(5, 7))}월 ${Number(member.scheduledWorkDate.slice(8, 10))}일 출근 예정`}
+                            </span>
+                          )}
+                          <span className="bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded-lg text-[10px]">
+                            출근 가능
+                          </span>
+                        </div>
                       </div>
                     );
                   })
