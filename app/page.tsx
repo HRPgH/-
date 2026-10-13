@@ -2035,74 +2035,26 @@ export default function Home() {
                               전체 선택 ({dateSelectionCount}/{possible.length})
                             </button>
                             {dateSelectionCount > 0 && (
-                              <div className="space-y-2">
-                                <div className="grid grid-cols-2 gap-2">
-                                  <button
-                                    onClick={() => {
-                                      setGroupMessageRecipientKeys(
-                                        possible.filter(
-                                          (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
-                                        )
-                                      );
-                                      setShowGroupMsgModal(true);
-                                    }}
-                                    className="justify-center bg-blue-600 hover:bg-blue-500 text-white font-bold px-2 py-2 rounded-lg text-[10px] flex items-center gap-1 transition"
-                                  >
-                                    <Send className="w-3.5 h-3.5" /> 메시지 ({dateSelectionCount})
-                                  </button>
-                                  <button
-                                    onClick={() => handleDownloadSelectedConfirmed(date, possible)}
-                                    className="justify-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2 py-2 rounded-lg text-[10px] flex items-center gap-1 transition"
-                                  >
-                                    <Download className="w-3.5 h-3.5" /> 엑셀 다운로드
-                                  </button>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-300 bg-blue-50 p-2">
-                                  <span className="text-[11px] font-bold text-blue-800">
-                                    선택 {dateSelectionCount}명 출근 예정일
-                                  </span>
-                                  <input
-                                    type="date"
-                                    value={scheduledWorkDateInputs[date] || date}
-                                    onChange={(event) =>
-                                      setScheduledWorkDateInputs((previous) => ({
-                                        ...previous,
-                                        [date]: event.target.value,
-                                      }))
-                                    }
-                                    className="min-w-0 rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-700"
-                                    aria-label={`${formatDateLabel(date)} 응답 선택 인원 출근 예정일`}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const selectedKeys = possible.filter(
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  onClick={() => {
+                                    setGroupMessageRecipientKeys(
+                                      possible.filter(
                                         (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
-                                      );
-                                      saveSelectedScheduledWorkDate(
-                                        selectedKeys,
-                                        scheduledWorkDateInputs[date] || date
-                                      );
-                                    }}
-                                    disabled={isSavingScheduledWorkDate}
-                                    className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60"
-                                  >
-                                    {isSavingScheduledWorkDate ? '저장 중...' : '예정일 저장'}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const selectedKeys = possible.filter(
-                                        (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
-                                      );
-                                      saveSelectedScheduledWorkDate(selectedKeys, null);
-                                    }}
-                                    disabled={isSavingScheduledWorkDate}
-                                    className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
-                                  >
-                                    예정 해제
-                                  </button>
-                                </div>
+                                      )
+                                    );
+                                    setShowGroupMsgModal(true);
+                                  }}
+                                  className="justify-center bg-blue-600 hover:bg-blue-500 text-white font-bold px-2 py-2 rounded-lg text-[10px] flex items-center gap-1 transition"
+                                >
+                                  <Send className="w-3.5 h-3.5" /> 메시지 ({dateSelectionCount})
+                                </button>
+                                <button
+                                  onClick={() => handleDownloadSelectedConfirmed(date, possible)}
+                                  className="justify-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2 py-2 rounded-lg text-[10px] flex items-center gap-1 transition"
+                                >
+                                  <Download className="w-3.5 h-3.5" /> 엑셀 다운로드
+                                </button>
                               </div>
                             )}
                           </div>
@@ -2774,27 +2726,77 @@ export default function Home() {
                       전체 선택 ({selectedConfirmedCount}/{confirmedCount})
                     </button>
                     {selectedConfirmedCount > 0 && (
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => {
-                            setGroupMessageRecipientKeys(
-                              confirmedList.filter(
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => {
+                              setGroupMessageRecipientKeys(
+                                confirmedList.filter(
+                                  (idKey) =>
+                                    selectedConfirmedMembers[getConfirmedSelectionKey(selectedAvailabilityDate, idKey)]
+                                )
+                              );
+                              setShowGroupMsgModal(true);
+                            }}
+                            className="justify-center bg-blue-600 hover:bg-blue-500 text-white font-bold px-2 py-2 rounded-lg text-[11px] flex items-center gap-1 transition shadow-sm"
+                          >
+                            <Send className="w-3.5 h-3.5" /> 선택 인원에게 메시지 ({selectedConfirmedCount})
+                          </button>
+                          <button
+                            onClick={() => handleDownloadSelectedConfirmed()}
+                            className="justify-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2 py-2 rounded-lg text-[11px] flex items-center gap-1 transition shadow-sm"
+                          >
+                            <Download className="w-3.5 h-3.5" /> 엑셀 다운로드 ({selectedConfirmedCount})
+                          </button>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-blue-300 bg-blue-50 p-2">
+                          <span className="text-[11px] font-bold text-blue-800">
+                            선택 {selectedConfirmedCount}명 예정일 지정
+                          </span>
+                          <input
+                            type="date"
+                            value={scheduledWorkDateInputs[selectedAvailabilityDate] || selectedAvailabilityDate}
+                            onChange={(event) =>
+                              setScheduledWorkDateInputs((previous) => ({
+                                ...previous,
+                                [selectedAvailabilityDate]: event.target.value,
+                              }))
+                            }
+                            className="min-w-0 rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-700"
+                            aria-label={`${formatDateLabel(selectedAvailabilityDate)} 출근 응답 선택 인원 예정일`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const selectedKeys = confirmedList.filter(
                                 (idKey) =>
                                   selectedConfirmedMembers[getConfirmedSelectionKey(selectedAvailabilityDate, idKey)]
-                              )
-                            );
-                            setShowGroupMsgModal(true);
-                          }}
-                          className="justify-center bg-blue-600 hover:bg-blue-500 text-white font-bold px-2 py-2 rounded-lg text-[11px] flex items-center gap-1 transition shadow-sm"
-                        >
-                          <Send className="w-3.5 h-3.5" /> 선택 인원에게 메시지 ({selectedConfirmedCount})
-                        </button>
-                        <button
-                          onClick={() => handleDownloadSelectedConfirmed()}
-                          className="justify-center bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2 py-2 rounded-lg text-[11px] flex items-center gap-1 transition shadow-sm"
-                        >
-                          <Download className="w-3.5 h-3.5" /> 엑셀 다운로드 ({selectedConfirmedCount})
-                        </button>
+                              );
+                              saveSelectedScheduledWorkDate(
+                                selectedKeys,
+                                scheduledWorkDateInputs[selectedAvailabilityDate] || selectedAvailabilityDate
+                              );
+                            }}
+                            disabled={isSavingScheduledWorkDate}
+                            className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60"
+                          >
+                            {isSavingScheduledWorkDate ? '저장 중...' : '예정일 저장'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const selectedKeys = confirmedList.filter(
+                                (idKey) =>
+                                  selectedConfirmedMembers[getConfirmedSelectionKey(selectedAvailabilityDate, idKey)]
+                              );
+                              saveSelectedScheduledWorkDate(selectedKeys, null);
+                            }}
+                            disabled={isSavingScheduledWorkDate}
+                            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
+                          >
+                            예정 해제
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
