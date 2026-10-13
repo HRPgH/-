@@ -1144,16 +1144,13 @@ export default function Home() {
     });
   };
 
-  const handleDownloadSelectedConfirmed = (date = selectedAvailabilityDate, memberKeys = confirmedList) => {
-    const selectedKeys = memberKeys.filter(
-      (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
-    );
-    if (selectedKeys.length === 0) {
-      alert('엑셀로 다운로드할 출근 확정 인원을 선택해 주세요.');
+  const downloadConfirmedMembers = (date: string, memberKeys: string[]) => {
+    if (memberKeys.length === 0) {
+      alert('해당 날짜에 출근 가능으로 응답한 인원이 없습니다.');
       return;
     }
 
-    const exportRows = selectedKeys.map((idKey) => {
+    const exportRows = memberKeys.map((idKey) => {
       const member = memberDb[idKey];
       return {
         응답일: date,
@@ -1175,6 +1172,21 @@ export default function Home() {
     XLSX.utils.book_append_sheet(workbook, worksheet, '출근 확정 명단');
 
     XLSX.writeFile(workbook, `출근_응답명단_${date.replace(/-/g, '')}.xlsx`);
+  };
+
+  const handleDownloadSelectedConfirmed = (date = selectedAvailabilityDate, memberKeys = confirmedList) => {
+    const selectedKeys = memberKeys.filter(
+      (idKey) => selectedConfirmedMembers[getConfirmedSelectionKey(date, idKey)]
+    );
+    if (selectedKeys.length === 0) {
+      alert('엑셀로 다운로드할 출근 확정 인원을 선택해 주세요.');
+      return;
+    }
+    downloadConfirmedMembers(date, selectedKeys);
+  };
+
+  const handleDownloadConfirmedRoster = () => {
+    downloadConfirmedMembers(selectedAvailabilityDate, confirmedList);
   };
 
   const handleDeleteSelected = async () => {
@@ -2216,12 +2228,22 @@ export default function Home() {
                     ></div>
                   </div>
 
-                  <button
-                    onClick={() => setShowConfirmedModal(true)}
-                    className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold text-sm text-white transition shadow-lg shadow-blue-900/50"
-                  >
-                    출근 명단 확인 · {formatDateLabel(selectedAvailabilityDate)} ({confirmedCount}명)
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setShowConfirmedModal(true)}
+                      className="bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold text-xs text-white transition shadow-lg shadow-blue-900/50"
+                    >
+                      출근 명단 확인 · {formatDateLabel(selectedAvailabilityDate)} ({confirmedCount}명)
+                    </button>
+                    <button
+                      onClick={handleDownloadConfirmedRoster}
+                      disabled={confirmedCount === 0}
+                      className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-3 text-xs font-bold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Download className="h-4 w-4" />
+                      엑셀 다운로드
+                    </button>
+                  </div>
                   {Object.entries(memberDb).some(([, member]) => member.scheduledWorkDate === selectedAvailabilityDate) && (
                     <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50 p-3">
                       <p className="text-xs font-bold text-blue-800 mb-1">
