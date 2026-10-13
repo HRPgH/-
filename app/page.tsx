@@ -2286,9 +2286,16 @@ export default function Home() {
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => setShowConfirmedModal(true)}
-                      className="bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold text-xs text-white transition shadow-lg shadow-blue-900/50"
+                      className="flex flex-col items-center justify-center gap-0.5 bg-blue-600 hover:bg-blue-500 py-2.5 rounded-xl font-bold text-xs leading-tight text-white transition shadow-lg shadow-blue-900/50"
                     >
-                      출근 명단 확인 · {formatDateLabel(selectedAvailabilityDate)} ({confirmedCount}명)
+                      <span>출근 명단 확인</span>
+                      <span className="text-[10px]">
+                        {new Date(`${selectedAvailabilityDate}T00:00:00`).toLocaleDateString('ko-KR', {
+                          month: 'numeric',
+                          day: 'numeric',
+                          weekday: 'short',
+                        })} · {confirmedCount}명
+                      </span>
                     </button>
                     <button
                       onClick={handleDownloadConfirmedRoster}
