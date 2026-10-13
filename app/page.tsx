@@ -110,6 +110,7 @@ export default function Home() {
 
   const [selectedMembers, setSelectedMembers] = useState<{ [idKey: string]: boolean }>({});
   const [scheduledWorkDateInputs, setScheduledWorkDateInputs] = useState<{ [responseDate: string]: string }>({});
+  const [scheduledRosterDateInputs, setScheduledRosterDateInputs] = useState<{ [idKey: string]: string }>({});
   const [isSavingScheduledWorkDate, setIsSavingScheduledWorkDate] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1179,7 +1180,7 @@ export default function Home() {
 
     const targetKeys = selectedKeys.filter((idKey) => memberDb[idKey]);
     if (targetKeys.length === 0) {
-      alert('출근 응답 명단에서 출근 예정일을 지정할 인원을 선택해 주세요.');
+      alert('출근 예정일을 지정할 인원을 확인해 주세요.');
       return;
     }
     if (scheduledWorkDate && !/^\d{4}-\d{2}-\d{2}$/.test(scheduledWorkDate)) {
@@ -2754,25 +2755,62 @@ export default function Home() {
                       <div className="space-y-1.5">
                         {scheduled.map((idKey) => {
                           const member = memberDb[idKey];
+                          const editDate = scheduledRosterDateInputs[idKey] ?? date;
                           return (
                             <div
                               key={idKey}
-                              className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2"
+                              className="space-y-2 rounded-xl border border-slate-200 bg-white px-3 py-2"
                             >
-                              <div>
-                                <p className="text-xs font-bold text-slate-800">
-                                  {member?.name || idKey.split('_')[0]}
-                                  <span className="ml-1.5 font-mono text-[10px] text-blue-700">
-                                    {member?.code || idKey.split('_')[1]}
-                                  </span>
-                                </p>
-                                <p className="mt-0.5 text-[10px] text-slate-400">
-                                  {member?.part || '포장 · 주간조'}
-                                </p>
+                              <div className="flex items-center justify-between gap-2">
+                                <div>
+                                  <p className="text-xs font-bold text-slate-800">
+                                    {member?.name || idKey.split('_')[0]}
+                                    <span className="ml-1.5 font-mono text-[10px] text-blue-700">
+                                      {member?.code || idKey.split('_')[1]}
+                                    </span>
+                                  </p>
+                                  <p className="mt-0.5 text-[10px] text-slate-400">
+                                    {member?.part || '포장 · 주간조'}
+                                  </p>
+                                </div>
+                                <span className="shrink-0 rounded-lg bg-blue-100 px-2 py-1 text-[10px] font-bold text-blue-700">
+                                  출근 예정
+                                </span>
                               </div>
-                              <span className="shrink-0 rounded-lg bg-blue-100 px-2 py-1 text-[10px] font-bold text-blue-700">
-                                출근 예정
-                              </span>
+                              <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
+                                <label className="text-[10px] font-bold text-slate-500" htmlFor={`scheduled-date-${idKey}`}>
+                                  예정일 변경
+                                </label>
+                                <input
+                                  id={`scheduled-date-${idKey}`}
+                                  type="date"
+                                  value={editDate}
+                                  onChange={(event) =>
+                                    setScheduledRosterDateInputs((previous) => ({
+                                      ...previous,
+                                      [idKey]: event.target.value,
+                                    }))
+                                  }
+                                  disabled={isSavingScheduledWorkDate}
+                                  className="min-w-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs font-bold text-slate-700"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => saveSelectedScheduledWorkDate([idKey], editDate)}
+                                  disabled={isSavingScheduledWorkDate || !editDate || editDate === date}
+                                  className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-[10px] font-bold text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  변경 저장
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => saveSelectedScheduledWorkDate([idKey], null)}
+                                  disabled={isSavingScheduledWorkDate}
+                                  className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[10px] font-bold text-slate-600 transition hover:bg-slate-100 disabled:cursor-wait disabled:opacity-60"
+                                >
+                                  예정 해제
+                                </button>
+                              </div>
                             </div>
                           );
                         })}
